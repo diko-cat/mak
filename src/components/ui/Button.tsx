@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 type Variant = 'primary' | 'secondary' | 'quiet' | 'light';
@@ -15,4 +16,20 @@ const variants: Record<Variant, string> = {
 
 export function Button({ variant = 'primary', className = '', children, ...props }: ButtonProps) {
   return <button className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${variants[variant]} ${className}`} {...props}>{children}</button>;
+=======
+import type { ButtonHTMLAttributes, PropsWithChildren } from 'react'
+
+export type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'light'
+
+export function buttonStyles(variant: ButtonVariant = 'primary', className = ''): string {
+  return `button button--${variant} ${className}`.trim()
+}
+
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: ButtonVariant
+}
+
+export function Button({ variant = 'primary', className = '', children, ...props }: PropsWithChildren<ButtonProps>) {
+  return <button className={buttonStyles(variant, className)} {...props}>{children}</button>
+>>>>>>> 46ee541 (Set up clinic foundation and public flows)
 }

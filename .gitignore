@@ -1,5 +1,13 @@
+<<<<<<< HEAD
 node_modules
 dist
 .DS_Store
 *.local
 npm-debug.log*
+=======
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+.DS_Store
+>>>>>>> 46ee541 (Set up clinic foundation and public flows)
