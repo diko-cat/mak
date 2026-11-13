@@ -1,9 +1,10 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+﻿import { Navigate, Route, Routes } from 'react-router-dom';
 import { PublicLayout } from '../components';
 import { BookingPage } from '../pages/public/BookingPage';
 import { HomePage } from '../pages/public/HomePage';
 import { LoginPage } from '../pages/public/LoginPage';
 import { RoleLanding } from '../pages/public/RoleLanding';
+import { AdminPage } from '../pages/admin/AdminPage';
 import { ProtectedRoute } from './ProtectedRoute';
 
 export function AppRoutes() {
@@ -17,8 +18,9 @@ export function AppRoutes() {
       </Route>
       <Route element={<ProtectedRoute allowedRoles={['doctor']} />}><Route path="doctor" element={<RoleLanding />} /></Route>
       <Route element={<ProtectedRoute allowedRoles={['registrar']} />}><Route path="registrar" element={<RoleLanding />} /></Route>
-      <Route element={<ProtectedRoute allowedRoles={['admin']} />}><Route path="admin" element={<RoleLanding />} /></Route>
+      <Route element={<ProtectedRoute allowedRoles={['admin']} />}><Route path="admin" element={<AdminPage />} /></Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>
   </Routes>;
 }
+
