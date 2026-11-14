@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-export * from './domain';
-export * from './api';
-=======
 export type Role = 'patient' | 'doctor' | 'admin'
 
 export interface Clinic {
@@ -151,4 +147,3 @@ export class ApiError extends Error {
     this.code = code
   }
 }
->>>>>>> 46ee541 (Set up clinic foundation and public flows)
