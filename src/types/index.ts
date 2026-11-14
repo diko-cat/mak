@@ -21,6 +21,10 @@ export interface Doctor {
   rating: number
   initials: string
   accent: string
+  /** Врач принимает записи. `false` — в отпуске/не работает; по умолчанию активен. */
+  active?: boolean
+  /** Номер кабинета приёма. */
+  room?: string
 }
 
 export interface Service {
@@ -30,6 +34,8 @@ export interface Service {
   description: string
   price: number
   durationMinutes: number
+  /** Специальность врача, который оказывает услугу (совпадает с `Doctor.specialty`). */
+  specialty?: string
 }
 
 export interface Patient {
@@ -38,6 +44,8 @@ export interface Patient {
   email: string
   phone: string
   birthDate: string
+  /** Номер медицинской карты. */
+  cardNumber?: string
 }
 
 export interface User {
@@ -63,7 +71,10 @@ export interface Appointment {
   serviceId: string
   startsAt: string
   status: AppointmentStatus
+  /** Причина обращения. */
   note?: string
+  /** Номер талона, выдаётся при записи. */
+  ticketNumber?: string
 }
 
 export interface MedicalConclusion {
@@ -74,6 +85,14 @@ export interface MedicalConclusion {
   createdAt: string
   diagnosis: string
   recommendations: string
+}
+
+export interface LabIndicator {
+  name: string
+  value: number
+  unit: string
+  min: number
+  max: number
 }
 
 export type LabTestStatus = 'ordered' | 'in-progress' | 'ready'
@@ -87,6 +106,7 @@ export interface LabTest {
   resultAt?: string
   status: LabTestStatus
   result?: string
+  indicators?: LabIndicator[]
 }
 
 export interface CallRequest {
@@ -136,6 +156,26 @@ export interface AppointmentFilters {
   patientId?: string
   doctorId?: string
   status?: AppointmentStatus
+}
+
+export interface CompleteAppointmentInput {
+  /** Заключение врача, минимум 10 символов. */
+  diagnosis: string
+  /** Назначения и рекомендации. */
+  recommendations: string
+}
+
+export type SlotUnavailableReason = 'past' | 'busy'
+
+export interface DaySlot {
+  startsAt: string
+  available: boolean
+  reason?: SlotUnavailableReason
+}
+
+export interface ConclusionFilters {
+  patientId?: string
+  doctorId?: string
 }
 
 export class ApiError extends Error {
