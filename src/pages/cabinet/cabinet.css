@@ -243,3 +243,9 @@
   .patient-row__head .patient-row__chevron { grid-row: 1; grid-column: 2; }
   .day-strip { grid-template-columns: repeat(7, 64px); }
 }
+
+/* Глубина карточек кабинета */
+.panel { border-radius: 16px; box-shadow: var(--shadow-sm); }
+.cabinet-tabs { border-radius: 14px; box-shadow: var(--shadow-sm); }
+.cabinet-tab { border-radius: 10px; }
+.ticket { border-radius: 16px; box-shadow: var(--shadow-sm); }

@@ -19,9 +19,11 @@ import {
   Stethoscope,
   UsersRound,
 } from 'lucide-react'
+import gsap from 'gsap'
 import { Link, useLocation } from 'react-router-dom'
 import { createCallRequest, getClinic, getDoctors, getServices } from '../../api'
 import { Badge, Button, SectionHeading, buttonStyles } from '../../components/ui'
+import { useReveal } from '../../hooks/useReveal'
 import { useSession } from '../../store/session'
 import type { Clinic, Doctor, Service } from '../../types'
 
@@ -62,6 +64,21 @@ export function HomePage() {
       window.history.replaceState({}, document.title)
     }
   }, [location.state])
+
+  // Вступительная анимация первого экрана
+  useEffect(() => {
+    const mm = gsap.matchMedia()
+    mm.add('(prefers-reduced-motion: no-preference)', () => {
+      gsap.from('.hero-copy > *', { autoAlpha: 0, y: 22, duration: 0.6, stagger: 0.09, ease: 'power2.out', clearProps: 'all' })
+      gsap.from('.hero-art', { autoAlpha: 0, scale: 0.96, duration: 0.8, delay: 0.15, ease: 'power2.out', clearProps: 'all' })
+    })
+    return () => mm.revert()
+  }, [])
+
+  // Появление блоков при прокрутке
+  useReveal('.about-aside, .section-heading, .principle-card, .services-intro-card, .access-panel, .contact-copy, .callback-card')
+  useReveal('.service-row', [services.length])
+  useReveal('.doctor-card', [doctors.length])
 
   const bookTarget = user ? '/patient/appointments/new' : '/login'
   const bookState = user ? undefined : {
