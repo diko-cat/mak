@@ -1,117 +1,3 @@
-<<<<<<< HEAD
-import { ApiError, type ApiContract, type PublicUser } from '../types';
-import type { Appointment, UserAccount } from '../types';
-import { createId } from './storage';
-import { readDatabase, writeDatabase } from './storage';
-
-const publicUser = ({ password: _password, ...user }: UserAccount): PublicUser => user;
-
-export const api: ApiContract = {
-  auth: {
-    async login({ email, password }) {
-      const account = readDatabase().users.find((user) => user.email.toLowerCase() === email.trim().toLowerCase() && user.password === password);
-      if (!account) throw new ApiError('Проверьте email и пароль и попробуйте ещё раз.', 'INVALID_CREDENTIALS');
-      return publicUser(account);
-    },
-    async currentUser() {
-      const sessionId = window.localStorage.getItem('mak-clinic:session:v1');
-      if (!sessionId) return null;
-      const account = readDatabase().users.find((user) => user.id === sessionId);
-      return account ? publicUser(account) : null;
-    },
-    async logout() {
-      window.localStorage.removeItem('mak-clinic:session:v1');
-    },
-  },
-  clinic: { async get() { return readDatabase().clinic; } },
-  doctors: {
-    async list() { return readDatabase().doctors; },
-    async get(id) { return readDatabase().doctors.find((doctor) => doctor.id === id) ?? null; },
-  },
-  services: {
-    async list() { return readDatabase().services; },
-    async get(id) { return readDatabase().services.find((service) => service.id === id) ?? null; },
-  },
-  patients: {
-    async list() { return readDatabase().patients; },
-    async get(id) { return readDatabase().patients.find((patient) => patient.id === id) ?? null; },
-  },
-  appointments: {
-    async list(filters = {}) {
-      return readDatabase().appointments.filter((item) => (!filters.patientId || item.patientId === filters.patientId) && (!filters.doctorId || item.doctorId === filters.doctorId));
-    },
-    async get(id) { return readDatabase().appointments.find((item) => item.id === id) ?? null; },
-    async create(input) {
-      const database = readDatabase();
-      const startsAt = new Date(input.startsAt);
-      if (Number.isNaN(startsAt.getTime())) throw new ApiError('Укажите корректную дату и время.', 'VALIDATION');
-      if (startsAt.getTime() <= Date.now()) throw new ApiError('Нельзя записаться на время, которое уже прошло.', 'PAST_SLOT');
-      if (!database.patients.some((patient) => patient.id === input.patientId) || !database.doctors.some((doctor) => doctor.id === input.doctorId) || !database.services.some((service) => service.id === input.serviceId)) {
-        throw new ApiError('Не удалось найти пациента, врача или услугу.', 'NOT_FOUND');
-      }
-      const service = database.services.find((item) => item.id === input.serviceId)!;
-      const end = startsAt.getTime() + service.durationMinutes * 60_000;
-      const hasConflict = database.appointments.some((appointment) => {
-        if (appointment.status !== 'scheduled' || appointment.doctorId !== input.doctorId) return false;
-        const bookedService = database.services.find((item) => item.id === appointment.serviceId);
-        const bookedStart = new Date(appointment.startsAt).getTime();
-        const bookedEnd = bookedStart + (bookedService?.durationMinutes ?? 30) * 60_000;
-        return startsAt.getTime() < bookedEnd && end > bookedStart;
-      });
-      if (hasConflict) throw new ApiError('Это время уже занято. Выберите другой слот.', 'SLOT_TAKEN');
-      const appointment: Appointment = { ...input, id: createId('appointment'), status: 'scheduled' };
-      database.appointments.push(appointment);
-      writeDatabase(database);
-      return appointment;
-    },
-    async cancel(id) {
-      const database = readDatabase();
-      const appointment = database.appointments.find((item) => item.id === id);
-      if (!appointment) throw new ApiError('Запись не найдена.', 'NOT_FOUND');
-      appointment.status = 'cancelled';
-      writeDatabase(database);
-      return appointment;
-    },
-  },
-  conclusions: {
-    async list(filters = {}) {
-      return readDatabase().conclusions.filter((item) => (!filters.patientId || item.patientId === filters.patientId) && (!filters.doctorId || item.doctorId === filters.doctorId));
-    },
-    async create(input) {
-      const database = readDatabase();
-      if (!database.appointments.some((item) => item.id === input.appointmentId)) throw new ApiError('Запись для заключения не найдена.', 'NOT_FOUND');
-      const conclusion = { ...input, id: createId('conclusion'), createdAt: new Date().toISOString() };
-      database.conclusions.push(conclusion);
-      writeDatabase(database);
-      return conclusion;
-    },
-  },
-  labTests: {
-    async list(filters = {}) { return readDatabase().labTests.filter((item) => !filters.patientId || item.patientId === filters.patientId); },
-    async create(input) {
-      const database = readDatabase();
-      if (!database.patients.some((item) => item.id === input.patientId)) throw new ApiError('Пациент не найден.', 'NOT_FOUND');
-      const test = { ...input, id: createId('lab'), orderedAt: new Date().toISOString(), status: 'ordered' as const };
-      database.labTests.push(test);
-      writeDatabase(database);
-      return test;
-    },
-  },
-  callbacks: {
-    async list() { return readDatabase().callbacks; },
-    async create(input) {
-      if (!input.name.trim() || !input.phone.trim()) throw new ApiError('Укажите имя и номер телефона.', 'VALIDATION');
-      const database = readDatabase();
-      const request = { ...input, name: input.name.trim(), phone: input.phone.trim(), id: createId('callback'), createdAt: new Date().toISOString(), status: 'new' as const };
-      database.callbacks.unshift(request);
-      writeDatabase(database);
-      return request;
-    },
-  },
-};
-
-export { ApiError } from '../types';
-=======
 import {
   ApiError,
   type Appointment,
@@ -119,6 +5,9 @@ import {
   type AppointmentStatus,
   type CallRequest,
   type Clinic,
+  type CompleteAppointmentInput,
+  type ConclusionFilters,
+  type DaySlot,
   type CreateAppointmentInput,
   type CreateCallRequestInput,
   type CreateConclusionInput,
@@ -197,11 +86,12 @@ function appointmentConflicts(
   return newStart < existingEnd && existingStart < newEnd
 }
 
-export async function getAvailableSlots(
+/** Все слоты дня (09:00–17:00, шаг 30 минут) с пометкой, свободен ли слот и почему нет. */
+export async function getDaySlots(
   doctorId: string,
   date: string,
   durationMinutes = 30,
-): Promise<string[]> {
+): Promise<DaySlot[]> {
   const database = readDatabase()
   if (!database.doctors.some((doctor) => doctor.id === doctorId)) {
     throw new ApiError('Выбранный врач не найден.', 'DOCTOR_NOT_FOUND')
@@ -209,15 +99,25 @@ export async function getAvailableSlots(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(new Date(`${date}T00:00:00`).getTime())) {
     throw new ApiError('Выберите корректную дату.', 'INVALID_APPOINTMENT_DATE')
   }
-  const slots: string[] = []
+  const slots: DaySlot[] = []
   for (let minutes = 9 * 60; minutes <= 17 * 60; minutes += 30) {
     const start = new Date(`${date}T00:00:00`)
     start.setMinutes(minutes)
-    if (start.getTime() <= Date.now()) continue
-    if (database.appointments.some((appointment) => appointmentConflicts(appointment, database, doctorId, start, durationMinutes))) continue
-    slots.push(start.toISOString())
+    const startsAt = start.toISOString()
+    if (start.getTime() <= Date.now()) slots.push({ startsAt, available: false, reason: 'past' })
+    else if (database.appointments.some((appointment) => appointmentConflicts(appointment, database, doctorId, start, durationMinutes))) slots.push({ startsAt, available: false, reason: 'busy' })
+    else slots.push({ startsAt, available: true })
   }
   return slots
+}
+
+export async function getAvailableSlots(
+  doctorId: string,
+  date: string,
+  durationMinutes = 30,
+): Promise<string[]> {
+  const slots = await getDaySlots(doctorId, date, durationMinutes)
+  return slots.filter((slot) => slot.available).map((slot) => slot.startsAt)
 }
 
 export async function createAppointment(input: CreateAppointmentInput): Promise<Appointment> {
@@ -230,6 +130,8 @@ export async function createAppointment(input: CreateAppointmentInput): Promise<
   if (!doctor) throw new ApiError('Выбранный врач не найден.', 'DOCTOR_NOT_FOUND')
   if (!patient) throw new ApiError('Пациент не найден.', 'PATIENT_NOT_FOUND')
   if (!service) throw new ApiError('Выбранная услуга не найдена.', 'SERVICE_NOT_FOUND')
+  if (doctor.active === false) throw new ApiError('Этот врач сейчас не принимает. Выберите другого специалиста.', 'DOCTOR_INACTIVE')
+  if (service.specialty && service.specialty !== doctor.specialty) throw new ApiError('Эту услугу оказывает врач другой специальности.', 'DOCTOR_SPECIALTY_MISMATCH')
   if (Number.isNaN(startsAt.getTime())) throw new ApiError('Выберите корректную дату и время.', 'INVALID_APPOINTMENT_TIME')
   if (startsAt.getTime() <= Date.now()) throw new ApiError('Нельзя записаться на прошедшее время.', 'PAST_APPOINTMENT')
   if (database.appointments.some((appointment) => appointmentConflicts(appointment, database, doctor.id, startsAt, service.durationMinutes))) {
@@ -238,12 +140,22 @@ export async function createAppointment(input: CreateAppointmentInput): Promise<
 
   const appointment: Appointment = {
     ...input,
+    note: input.note?.trim() || undefined,
     id: createId('appointment'),
     status: 'requested',
+    ticketNumber: nextTicketNumber(database),
   }
   database.appointments.push(appointment)
   writeDatabase(database)
   return appointment
+}
+
+function nextTicketNumber(database: MockDatabase): string {
+  const highest = database.appointments.reduce((max, appointment) => {
+    const number = Number(appointment.ticketNumber?.replace(/\D/g, ''))
+    return Number.isFinite(number) && number > max ? number : max
+  }, 100)
+  return `Т-${highest + 1}`
 }
 
 export async function updateAppointmentStatus(id: string, status: AppointmentStatus): Promise<Appointment> {
@@ -255,9 +167,12 @@ export async function updateAppointmentStatus(id: string, status: AppointmentSta
   return appointment
 }
 
-export async function getConclusions(patientId?: string): Promise<MedicalConclusion[]> {
+/** Принимает id пациента (как раньше) или фильтры по пациенту и врачу. */
+export async function getConclusions(filters: string | ConclusionFilters = {}): Promise<MedicalConclusion[]> {
+  const { patientId, doctorId } = typeof filters === 'string' ? { patientId: filters, doctorId: undefined } : filters
   return readDatabase().conclusions
     .filter((conclusion) => !patientId || conclusion.patientId === patientId)
+    .filter((conclusion) => !doctorId || conclusion.doctorId === doctorId)
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
 }
 
@@ -274,6 +189,34 @@ export async function createConclusion(input: CreateConclusionInput): Promise<Me
   database.conclusions.push(conclusion)
   writeDatabase(database)
   return conclusion
+}
+
+/** Завершает приём: сохраняет заключение врача и переводит запись в статус «completed». */
+export async function completeAppointment(
+  id: string,
+  input: CompleteAppointmentInput,
+): Promise<{ appointment: Appointment; conclusion: MedicalConclusion }> {
+  const database = readDatabase()
+  const appointment = database.appointments.find((entry) => entry.id === id)
+  if (!appointment) throw new ApiError('Запись не найдена.', 'APPOINTMENT_NOT_FOUND')
+  if (appointment.status === 'cancelled') throw new ApiError('Нельзя завершить отменённый приём.', 'APPOINTMENT_CANCELLED')
+  if (appointment.status === 'completed') throw new ApiError('Этот приём уже завершён.', 'APPOINTMENT_COMPLETED')
+  const diagnosis = input.diagnosis.trim()
+  if (diagnosis.length < 10) throw new ApiError('Заключение должно содержать минимум 10 символов.', 'VALIDATION_ERROR')
+
+  const conclusion: MedicalConclusion = {
+    id: createId('conclusion'),
+    patientId: appointment.patientId,
+    doctorId: appointment.doctorId,
+    appointmentId: appointment.id,
+    createdAt: new Date().toISOString(),
+    diagnosis,
+    recommendations: input.recommendations.trim(),
+  }
+  appointment.status = 'completed'
+  database.conclusions.push(conclusion)
+  writeDatabase(database)
+  return { appointment, conclusion }
 }
 
 export async function getLabTests(patientId?: string): Promise<LabTest[]> {
@@ -321,4 +264,3 @@ export async function createCallRequest(input: CreateCallRequestInput): Promise<
   writeDatabase(database)
   return request
 }
->>>>>>> 46ee541 (Set up clinic foundation and public flows)

@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
-<<<<<<< HEAD
-    "target": "ES2022",
-=======
     "target": "ES2023",
->>>>>>> 46ee541 (Set up clinic foundation and public flows)
     "lib": ["ES2023"],
     "module": "ESNext",
     "skipLibCheck": true,
