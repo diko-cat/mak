@@ -1,0 +1,101 @@
+/* Кабинет администратора: управление записями, врачами, расписанием и услугами. */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.admin-filters { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; }
+.admin-filters--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.cabinet .admin-filters .form-field, .admin-form-panel .form-field { margin-bottom: 12px; }
+.cabinet .cabinet-field input, .cabinet .cabinet-field select { min-width: 0; min-height: 44px; border-radius: 10px; font-size: 14px; }
+.cabinet .cabinet-field textarea { border-radius: 10px; }
+.admin-segmented { display: flex; max-width: 100%; }
+
+.admin-appointment .appointment-row__side { min-width: 0; }
+.admin-actions { justify-content: flex-end; }
+.admin-appointment__error { grid-column: 1 / -1; margin: 0; }
+.admin-reschedule { grid-column: 1 / -1; padding: 14px; border: 1px solid color-mix(in srgb, var(--green) 35%, var(--line)); border-radius: 10px; background: var(--surface); }
+.admin-reschedule__foot { margin-top: 12px; }
+.admin-reschedule .slot-grid { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); }
+
+.admin-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 380px); gap: 16px; align-items: start; }
+.admin-split > .panel:only-child { grid-column: 1 / -1; }
+.admin-form-panel { position: sticky; top: 100px; }
+.admin-group + .admin-group { margin-top: 18px; }
+.admin-group h3 { margin-bottom: 8px !important; }
+
+.admin-cards { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.admin-card { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--page); }
+.admin-card--muted { opacity: .72; }
+.admin-card__head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.admin-card__title { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
+.admin-card__title strong { color: var(--ink-strong); font-size: 14px; overflow-wrap: anywhere; }
+.admin-card__title small { font-size: 12px; overflow-wrap: anywhere; }
+.admin-card__meta { margin: 0; }
+.admin-badge { flex: 0 0 auto; padding: 4px 9px; border-radius: 99px; color: var(--green); background: var(--green-soft); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.admin-badge--off { color: var(--muted); background: var(--surface-alt); }
+
+.admin-check { display: inline-flex; align-items: center; gap: 9px; min-height: 44px; color: var(--ink); font-size: 13px; font-weight: 650; cursor: pointer; }
+.admin-check input { width: 18px; height: 18px; margin: 0; accent-color: var(--green); }
+
+.price-editor { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; }
+.price-editor label { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 13px; font-weight: 650; }
+.price-editor input { width: 96px; min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; outline: none; color: var(--green); background: var(--surface); font-size: 14px; font-weight: 700; text-align: right; }
+.price-editor input:focus { border-color: var(--green); }
+
+.admin-doctor-select { max-width: 480px; }
+.admin-subhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; }
+.week-hours { display: grid; gap: 6px; margin: 8px 0 4px; padding: 0; list-style: none; }
+.week-hours__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; padding: 4px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--page); }
+.week-hours__row--off { background: var(--surface-alt); }
+.week-hours__row .admin-check { min-width: 150px; }
+.week-hours__times { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); }
+.week-hours__times input, .admin-dayoff-add input { min-height: 40px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; outline: none; color: var(--ink); background: var(--surface); font-size: 14px; }
+.week-hours__times input:focus, .admin-dayoff-add input:focus { border-color: var(--green); }
+.admin-dayoff-add { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.admin-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.admin-chips li { display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 10px; border-radius: 99px; color: var(--ink-strong); background: var(--warn-soft); font-size: 12px; font-weight: 650; }
+.admin-chips__past { opacity: .55; }
+.admin-chips button { display: grid; width: 26px; height: 26px; place-items: center; border: 0; border-radius: 50%; color: inherit; background: transparent; cursor: pointer; }
+.admin-chips button:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.admin-warning { margin-top: 12px; padding: 12px 14px; border-radius: 10px; color: var(--warn); background: var(--warn-soft); font-size: 13px; }
+.admin-warning p { display: flex; gap: 6px; margin: 0 0 6px; font-weight: 650; }
+.admin-warning ul { margin: 0 0 8px; padding-left: 20px; color: var(--ink-strong); }
+.admin-form-foot { margin-top: 16px; }
+
+.admin-access__lead { margin: 0 0 12px; }
+.access-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+.access-table th, .access-table td { padding: 9px 8px; border-bottom: 1px solid var(--line); }
+.access-table thead th { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-align: center; text-transform: uppercase; }
+.access-table thead th:first-child { width: auto; text-align: left; }
+.access-table thead th:not(:first-child) { width: 110px; }
+.access-table tbody th { color: var(--ink); font-weight: 600; text-align: left; overflow-wrap: anywhere; }
+.access-table td { text-align: center; color: var(--muted-light); }
+.access-table td[data-allowed="true"] { color: var(--green); }
+.access-table tr:last-child th, .access-table tr:last-child td { border-bottom: 0; }
+
+.admin-load__name { min-width: 0; overflow-wrap: anywhere; }
+.admin-row > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 1000px) {
+  .admin-split { grid-template-columns: 1fr; }
+  .admin-form-panel { position: static; order: -1; }
+}
+@media (max-width: 780px) {
+  .admin-filters { grid-template-columns: 1fr; }
+  .admin-actions { justify-content: flex-start; }
+  .admin-appointment .appointment-row__side { flex-wrap: wrap; }
+}
+@media (max-width: 540px) {
+  .admin-filters--two { grid-template-columns: 1fr 1fr; gap: 0 8px; }
+  .admin-card { padding: 12px; }
+  .admin-card__head { flex-wrap: wrap; }
+  .admin-card__head .price-editor { width: 100%; justify-content: flex-start; }
+  .admin-reschedule { padding: 12px; }
+  .week-hours__row .admin-check { min-width: 0; }
+  .access-table { font-size: 12px; }
+  .access-table th, .access-table td { padding: 8px 4px; }
+  .access-table thead th { font-size: 9px; letter-spacing: 0; }
+  .access-table thead th:not(:first-child) { width: 58px; }
+}
+@media (min-width: 781px) and (max-width: 1100px) {
+  .admin-appointment .appointment-row__side { max-width: 230px; }
+  .admin-actions { flex-wrap: wrap; }
+}
