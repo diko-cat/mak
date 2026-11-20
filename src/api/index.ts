@@ -116,9 +116,6 @@ function appointmentConflicts(
   return newStart < existingEnd && existingStart < newEnd
 }
 
-<<<<<<< HEAD
-function slotsForDate(database: MockDatabase, doctorId: string, date: string, durationMinutes: number): DaySlot[] {
-=======
 /**
  * Слоты дня по рабочим часам врача (шаг 30 минут) с пометкой, свободен ли слот и почему нет.
  * В выходной, день-исключение или у неактивного врача слотов нет.
@@ -133,20 +130,13 @@ export async function getDaySlots(
   const database = readDatabase()
   const doctor = database.doctors.find((entry) => entry.id === doctorId)
   if (!doctor) throw new ApiError('Выбранный врач не найден.', 'DOCTOR_NOT_FOUND')
->>>>>>> 5cff3fa9cf2e135dcbf1bcbb30ce81446945c742
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(new Date(`${date}T00:00:00`).getTime())) {
     throw new ApiError('Выберите корректную дату.', 'INVALID_APPOINTMENT_DATE')
   }
   const interval = intervalFor(doctor, date)
   if (doctor.active === false || !interval) return []
   const slots: DaySlot[] = []
-<<<<<<< HEAD
-  const dayStartsAt = 9 * 60
-  const dayEndsAt = 17 * 60
-  for (let minutes = dayStartsAt; minutes + durationMinutes <= dayEndsAt; minutes += 30) {
-=======
   for (let minutes = toMinutes(interval.start); minutes + durationMinutes <= toMinutes(interval.end); minutes += SLOT_STEP_MINUTES) {
->>>>>>> 5cff3fa9cf2e135dcbf1bcbb30ce81446945c742
     const start = new Date(`${date}T00:00:00`)
     start.setMinutes(minutes)
     const startsAt = start.toISOString()
@@ -157,33 +147,19 @@ export async function getDaySlots(
   return slots
 }
 
-/** Все слоты дня (09:00–17:00, шаг 30 минут) с пометкой, свободен ли слот и почему нет. */
-export async function getDaySlots(
-  doctorId: string,
-  date: string,
-  durationMinutes = 30,
-): Promise<DaySlot[]> {
-  const database = readDatabase()
-  if (!database.doctors.some((doctor) => doctor.id === doctorId)) {
-    throw new ApiError('Выбранный специалист не найден.', 'DOCTOR_NOT_FOUND')
-  }
-  return slotsForDate(database, doctorId, date, durationMinutes)
-}
-
 /** Counts free appointment times for the requested dates in one calendar lookup. */
 export async function getCalendarAvailability(
   doctorId: string,
   dates: string[],
   durationMinutes = 30,
 ): Promise<Record<string, number>> {
-  const database = readDatabase()
-  if (!database.doctors.some((doctor) => doctor.id === doctorId)) {
-    throw new ApiError('Выбранный специалист не найден.', 'DOCTOR_NOT_FOUND')
-  }
-  return dates.reduce<Record<string, number>>((counts, date) => {
-    counts[date] = slotsForDate(database, doctorId, date, durationMinutes).filter((slot) => slot.available).length
-    return counts
-  }, {})
+  const doctor = readDatabase().doctors.find((entry) => entry.id === doctorId)
+  if (!doctor) throw new ApiError('Выбранный врач не найден.', 'DOCTOR_NOT_FOUND')
+  const availability = await Promise.all(dates.map(async (date) => {
+    const slots = await getDaySlots(doctorId, date, durationMinutes)
+    return [date, slots.filter((slot) => slot.available).length] as const
+  }))
+  return Object.fromEntries(availability)
 }
 
 export async function getAvailableSlots(
@@ -364,8 +340,6 @@ export async function createCallRequest(input: CreateCallRequestInput): Promise<
   writeDatabase(database)
   return request
 }
-<<<<<<< HEAD
-=======
 
 export async function updateCallRequestStatus(id: string, status: CallRequest['status']): Promise<CallRequest> {
   requirePermission('calls:manage')
@@ -538,4 +512,3 @@ export async function deleteService(id: string): Promise<void> {
   database.services = database.services.filter((entry) => entry.id !== id)
   writeDatabase(database)
 }
->>>>>>> 5cff3fa9cf2e135dcbf1bcbb30ce81446945c742
