@@ -85,8 +85,8 @@ export function AppointmentBookingRoute() {
     return (
       <main className="booking-page"><div className="container booking-success-card">
         <span className="booking-success-card__icon"><CheckCircle2 size={31} /></span>
-        <p className="eyebrow">ЗАПИСЬ СОЗДАНА</p><h1>Вы сделали важный шаг.</h1>
-        <p>Мы сохранили заявку и скоро подтвердим приём.</p>
+        <p className="eyebrow">ДЕМО-ЗАПИСЬ СОЗДАНА</p><h1>Вы сделали важный шаг.</h1>
+        <p>Заявка сохранена, а время занято в демо-расписании. Внешнего подтверждения приёма в прототипе нет.</p>
         <div className="booking-summary"><span><Stethoscope size={16} />{doctor?.name}</span><span><CalendarDays size={16} />{fullDate.format(new Date(success.startsAt))}</span><span><Clock3 size={16} />{clock.format(new Date(success.startsAt))}</span><span>{service?.name}</span></div>
         <Link className="button button--secondary" to="/patient">Вернуться в кабинет <ArrowRight size={16} /></Link>
       </div></main>
@@ -100,7 +100,7 @@ export function AppointmentBookingRoute() {
           <Link className="booking-back" to="/patient"><ArrowLeft size={15} /> В кабинет пациента</Link>
           <p className="eyebrow">ЗАПИСЬ НА ПРИЁМ</p>
           <h1>Выберите врача<br />и удобное время.</h1>
-          <p className="booking-lead">Мы сразу покажем только свободные слоты. Заявка сохранится в демо-системе клиники.</p>
+            <p className="booking-lead">Выберите услугу, врача, дату и свободное время. После записи слот займётся в демо-расписании.</p>
           <form className="booking-form" onSubmit={submit}>
             <label className="form-field"><span>Услуга</span><select required value={serviceId} onChange={(event) => setServiceId(event.target.value)}>{services.map((service) => <option key={service.id} value={service.id}>{service.name} · {new Intl.NumberFormat('ru-KZ').format(service.price)} ₸</option>)}</select></label>
             <label className="form-field"><span>Специалист</span><select required value={doctorId} onChange={(event) => setDoctorId(event.target.value)}>{doctors.map((doctor) => <option key={doctor.id} value={doctor.id}>{doctor.name} · {doctor.specialty}</option>)}</select></label>
@@ -109,14 +109,14 @@ export function AppointmentBookingRoute() {
               {loadingSlots ? <p className="slot-hint">Загружаем свободные слоты…</p> : slots.length > 0 ? <div className="slot-grid">{slots.map((availableSlot) => <button className={`slot-button ${slot === availableSlot ? 'slot-button--selected' : ''}`} type="button" key={availableSlot} onClick={() => { setSlot(availableSlot); setError('') }}>{clock.format(new Date(availableSlot))}</button>)}</div> : <p className="slot-hint">На эту дату свободных слотов нет. Выберите другой день.</p>}
             </fieldset>
             {error && <p className="form-message form-message--error" role="alert">{error}</p>}
-            <Button className="booking-submit" type="submit" disabled={submitting || !slot}>{submitting ? 'Сохраняем…' : 'Подтвердить запись'} <ArrowRight size={16} /></Button>
+            <Button className="booking-submit" type="submit" disabled={submitting || !slot}>{submitting ? 'Сохраняем…' : 'Подтвердить демо-запись'} <ArrowRight size={16} /></Button>
           </form>
         </section>
         <aside className="booking-aside">
           <span className="booking-aside__icon"><CalendarDays size={22} /></span>
           <p className="eyebrow">ВАШ ПРИЁМ</p>
           <h2>Без спешки и лишних шагов.</h2>
-          <p>После отправки заявки администратор свяжется с вами и подтвердит время приёма.</p>
+          <p>Демо-заявка сохранится в этом браузере, а выбранное время станет занятым в расписании.</p>
           <div className="booking-aside__detail"><Clock3 size={16} /><span>Принимаем ежедневно<br /><strong>с 08:00 до 20:00</strong></span></div>
           <div className="booking-aside__detail"><Stethoscope size={16} /><span>Команда из 6 врачей<br /><strong>разных специальностей</strong></span></div>
         </aside>
