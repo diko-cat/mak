@@ -27,7 +27,23 @@ export interface Doctor {
   active?: boolean
   /** Номер кабинета приёма. */
   room?: string
+  /** Рабочие часы по дням недели. Нет поля — работает ежедневно 09:00–17:00. */
+  workingHours?: WorkingHours
+  /** Даты-исключения (YYYY-MM-DD), когда врач не принимает: отпуск, больничный. */
+  daysOff?: string[]
 }
+
+/** Интервал рабочего дня, время в формате HH:MM. */
+export interface WorkingInterval {
+  start: string
+  end: string
+}
+
+/** Ключ — день недели как в `Date.getDay()` (0 — воскресенье … 6 — суббота); `null` — выходной. */
+export type WorkingHours = Record<number, WorkingInterval | null>
+
+export type DoctorInput = Omit<Doctor, 'id' | 'initials' | 'rating'> & { rating?: number }
+export type ServiceInput = Omit<Service, 'id'>
 
 export interface Service {
   id: string
@@ -168,6 +184,23 @@ export interface CompleteAppointmentInput {
 }
 
 export type SlotUnavailableReason = 'past' | 'busy'
+
+export type Permission =
+  | 'appointments:book'
+  | 'appointments:view-own'
+  | 'appointments:cancel-own'
+  | 'appointments:view-all'
+  | 'appointments:confirm'
+  | 'appointments:reschedule'
+  | 'appointments:cancel-any'
+  | 'appointments:complete'
+  | 'results:view-own'
+  | 'patients:view-own'
+  | 'patients:view-all'
+  | 'doctors:manage'
+  | 'services:manage'
+  | 'schedule:manage'
+  | 'calls:manage'
 
 export interface DaySlot {
   startsAt: string

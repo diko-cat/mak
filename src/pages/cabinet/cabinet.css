@@ -285,3 +285,33 @@
 .admin-row > span:first-child { display: flex; flex-direction: column; gap: 3px; }
 .admin-row small { font-size: 12px; }
 @media (max-width: 760px) { .admin-stats { grid-template-columns: 1fr 1fr; } }
+
+/* Телефоны 360–430 px: ничего не выходит за экран, длинные строки переносятся. */
+@media (max-width: 440px) {
+  .cabinet { padding-top: 18px; }
+  .cabinet .container { width: calc(100% - 24px); }
+  .cabinet-head h1 { font-size: 26px; overflow-wrap: anywhere; }
+  .cabinet-tabs { flex-wrap: wrap; margin: 18px 0 14px; overflow: visible; }
+  .cabinet-tab { padding: 0 12px; }
+  .panel { padding: 16px 14px; }
+  .panel__head { flex-wrap: wrap; }
+  .ticket__main { padding: 16px; }
+  .ticket__grid { gap: 12px 16px; }
+  .ticket__date { font-size: 19px; }
+  .appointment-row { padding: 12px; }
+  .appointment-row__side { flex-wrap: wrap; gap: 8px; }
+  .day-strip { grid-template-columns: repeat(7, 58px); }
+  .slot-grid { grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); }
+  .choice-grid { grid-template-columns: 1fr; }
+  .facts { gap: 10px 18px; }
+  .patient-card { gap: 10px; }
+  .conclusion-form__foot { flex-wrap: wrap; }
+  .booking-summary-card dl div { grid-template-columns: 70px minmax(0, 1fr); }
+  .lab__table th, .lab__table td { padding: 6px 4px; }
+  .segmented { display: flex; max-width: 100%; }
+  .segmented__item { padding: 0 10px; }
+  .admin-stats { gap: 8px; }
+  .admin-stat { padding: 12px 14px; }
+  .admin-stat strong { font-size: 20px; overflow-wrap: anywhere; }
+  .admin-row { flex-wrap: wrap; }
+}

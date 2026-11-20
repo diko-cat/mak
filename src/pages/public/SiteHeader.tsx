@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { ArrowUpRight, Menu, Moon, Sun, UserRound } from 'lucide-react'
+=======
+import { ArrowUpRight, Moon, Sun, UserRound } from 'lucide-react'
+>>>>>>> 5cff3fa9cf2e135dcbf1bcbb30ce81446945c742
 import { Link, useNavigate } from 'react-router-dom'
 import { useSession, clearSession } from '../../store/session'
 import { toggleTheme, useTheme } from '../../store/theme'
@@ -43,6 +47,7 @@ export function SiteHeader() {
           <a href="/#contacts">Контакты</a>
         </nav>
 
+<<<<<<< HEAD
         <details className="mobile-menu">
           <summary aria-label="Открыть меню"><Menu size={19} /></summary>
           <nav aria-label="Мобильная навигация">
@@ -53,6 +58,8 @@ export function SiteHeader() {
           </nav>
         </details>
 
+=======
+>>>>>>> 5cff3fa9cf2e135dcbf1bcbb30ce81446945c742
         <div className="site-header__actions">
           <label className="demo-role-switcher" title="Выбрать демо-роль">
             <UserRound size={15} aria-hidden="true" />
@@ -75,7 +82,11 @@ export function SiteHeader() {
               <button className="header-account__logout" type="button" onClick={signOut}>Выйти</button>
             </div>
           ) : (
+<<<<<<< HEAD
             <Link className="button button--secondary header-login" to="/login">Войти <ArrowUpRight size={15} /></Link>
+=======
+            <Link className="button button--secondary header-login" to="/login"><span className="header-login__full">Демо-вход</span><span className="header-login__short">Войти</span> <ArrowUpRight size={15} /></Link>
+>>>>>>> 5cff3fa9cf2e135dcbf1bcbb30ce81446945c742
           )}
         </div>
       </div>

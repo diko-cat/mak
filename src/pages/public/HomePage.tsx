@@ -83,14 +83,20 @@ export function HomePage() {
     return () => mm.revert()
   }, [])
 
-  // Появление блоков при прокрутке
   useReveal('.about-aside, .section-heading, .principle-card, .services-intro-card, .access-panel, .contact-copy, .callback-card')
   useReveal('.service-row', [services.length])
   useReveal('.doctor-card', [doctors.length])
 
+<<<<<<< HEAD
   const bookTarget = user ? '/patient/appointments/new' : '/login'
   const bookState = user ? undefined : {
     message: 'Войдите в демо-аккаунт пациента, чтобы выбрать врача и время приёма.',
+=======
+  const isPatient = user?.role === 'patient'
+  const bookTarget = isPatient ? '/patient/appointments/new' : '/login?role=patient'
+  const bookState = isPatient ? undefined : {
+    message: 'Это демонстрационная запись. Войдите в демо-аккаунт пациента, чтобы выбрать услугу, врача и свободное время.',
+>>>>>>> 5cff3fa9cf2e135dcbf1bcbb30ce81446945c742
     from: { pathname: '/patient/appointments/new' },
   }
 

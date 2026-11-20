@@ -17,13 +17,20 @@ export function SiteFooter() {
           <a href="/#services">Услуги и цены</a>
           <a href="/#doctors">Наши врачи</a>
           <a href="/#contacts">Связаться с нами</a>
+<<<<<<< HEAD
           <Link to="/privacy">Политика конфиденциальности</Link>
+=======
+>>>>>>> 5cff3fa9cf2e135dcbf1bcbb30ce81446945c742
         </div>
         <a className="footer-top-link" href="#top">Наверх <ArrowUpRight size={15} /></a>
       </div>
       <div className="container site-footer__bottom">
         <span>© {new Date().getFullYear()} Клиника «Сана»</span>
+<<<<<<< HEAD
         <span>Демо-сайт: официальные реквизиты и лицензия здесь не указаны</span>
+=======
+        <span>Информация на сайте представлена в демонстрационных целях</span>
+>>>>>>> 5cff3fa9cf2e135dcbf1bcbb30ce81446945c742
       </div>
     </footer>
   )
