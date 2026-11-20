@@ -422,7 +422,7 @@ button { color: inherit; }
 /* ───── Визуальная полировка: глубина, ритм, отклик на наведение ───── */
 .eyebrow { font-size: 12px; }
 .badge { padding: 9px 14px; font-size: 11px; }
-.site-nav a { position: relative; padding-block: 6px; font-size: 14px; }
+.site-nav a { position: relative; padding-block: 6px; font-size: 14px; white-space: nowrap; }
 .site-nav a::after { position: absolute; right: 0; bottom: 0; left: 0; height: 2px; border-radius: 2px; background: var(--green); content: ""; transform: scaleX(0); transform-origin: left; transition: transform .25s ease; }
 .site-nav a:hover::after { transform: scaleX(1); }
 .demo-role-switcher { height: 42px; padding-inline: 12px; }
@@ -554,9 +554,14 @@ button { color: inherit; }
 
 @media (max-width: 1000px) {
   .container { width: min(100% - 48px, 900px); }
-  .site-header__inner { gap: 20px; }
-  .site-nav { gap: 18px; }
+  .site-header__inner { gap: 16px; }
+  .site-nav { gap: 14px; }
+  .site-nav a { font-size: 13px; }
+  .brand__text > span { display: none; }
   .demo-role-switcher { padding-inline: 8px; }
+  .demo-role-switcher svg { display: none; }
+  .demo-role-switcher select { width: auto; max-width: 124px; }
+  .header-account__logout { white-space: nowrap; }
   .hero-grid { min-height: 405px; gap: 22px; }
   .hero-art { min-height: 390px; }
   .hero-art__arch { height: 335px; }
@@ -699,6 +704,30 @@ button { color: inherit; }
   .booking-success-card { margin-top: 32px; padding: 29px 18px; }
   .booking-success-card h1 { font-size: 27px; }
   .booking-summary { grid-template-columns: 1fr; }
+}
+
+/* Телефоны 360–430 px: шапка в одну строку без горизонтальной прокрутки, кнопки не меньше 40 px. */
+@media (max-width: 440px) {
+  .container { width: calc(100% - 24px); }
+  .site-header__inner { gap: 8px; }
+  .brand { flex: 0 1 auto; min-width: 0; }
+  .brand__text > span { display: none; }
+  .site-header__actions { flex: 0 1 auto; min-width: 0; gap: 6px; }
+  .demo-role-switcher { flex: 0 1 auto; min-width: 0; height: 40px; padding-inline: 8px 4px; }
+  .demo-role-switcher svg { display: none; }
+  .demo-role-switcher select { width: auto; max-width: 124px; min-width: 0; font-size: 13px; text-overflow: ellipsis; }
+  .theme-toggle { flex: 0 0 auto; width: 40px; height: 40px; }
+  .header-login, .header-account__link { flex: 0 0 auto; min-height: 40px; padding-inline: 12px; }
+  .header-login svg, .header-account__link svg { display: none; }
+  .hero-copy h1 { font-size: clamp(38px, 11.4vw, 50px); overflow-wrap: anywhere; }
+  .access-panel { width: 100%; padding-inline: 16px; }
+}
+@media (max-width: 370px) {
+  .brand__text { font-size: 17px; }
+  .site-header__actions { gap: 4px; }
+  .demo-role-switcher { padding-inline: 6px 2px; }
+  .demo-role-switcher select { max-width: 122px; font-size: 12px; }
+  .header-login, .header-account__link { padding-inline: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
