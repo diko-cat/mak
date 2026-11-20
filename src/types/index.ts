@@ -5,7 +5,7 @@ export interface Clinic {
   name: string
   tagline: string
   description: string
-  foundedYear: number
+  foundedYear?: number
   address: string
   phone: string
   email: string
@@ -16,6 +16,8 @@ export interface Doctor {
   id: string
   name: string
   specialty: string
+  /** Distinguishes physicians from other clinical staff such as lab technicians. */
+  profession?: 'physician' | 'clinical-specialist'
   description: string
   experienceYears: number
   rating: number
@@ -187,7 +189,3 @@ export class ApiError extends Error {
     this.code = code
   }
 }
-<<<<<<< HEAD
-=======
->>>>>>> 32a33964d3dfc2c35b3233d1af01f7b8fcfc127e
->>>>>>> 53d41b56e91a232979132ad699ea09408bd59c65

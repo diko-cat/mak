@@ -3,10 +3,6 @@ import type {
   CallRequest,
   Clinic,
   DemoAccount,
-<<<<<<< HEAD
-=======
->>>>>>> 32a33964d3dfc2c35b3233d1af01f7b8fcfc127e
->>>>>>> 53d41b56e91a232979132ad699ea09408bd59c65
   Doctor,
   LabTest,
   MedicalConclusion,
@@ -26,7 +22,7 @@ export interface MockDatabase {
   callRequests: CallRequest[]
 }
 
-export const DATABASE_KEY = 'sana-clinic.database.v2'
+export const DATABASE_KEY = 'sana-clinic.database.v3'
 
 const atDayAndHour = (dayOffset: number, hour: number, minute = 0) => {
   const value = new Date()
@@ -37,14 +33,14 @@ const atDayAndHour = (dayOffset: number, hour: number, minute = 0) => {
 
 export function createSeedDatabase(): MockDatabase {
   const doctors: Doctor[] = [
-    { id: 'doctor-1', name: 'Айгерим Сейтова', specialty: 'Кардиолог', description: 'Профилактика и лечение заболеваний сердца. Объясняет сложное простыми словами.', experienceYears: 14, rating: 4.9, initials: 'АС', accent: 'sage', room: '204' },
-    { id: 'doctor-2', name: 'Данияр Ахметов', specialty: 'Невролог', description: 'Помогает вернуть спокойный сон, ясность и свободу движения.', experienceYears: 11, rating: 4.9, initials: 'ДА', accent: 'blue', room: '208' },
-    { id: 'doctor-3', name: 'Жанна Ким', specialty: 'Педиатр', description: 'Бережно заботится о детях и всегда находит общий язык с родителями.', experienceYears: 16, rating: 5.0, initials: 'ЖК', accent: 'rose', room: '112' },
-    { id: 'doctor-4', name: 'Марат Нурланов', specialty: 'Дерматолог', description: 'Доказательный подход к здоровью кожи и её ежедневному уходу.', experienceYears: 9, rating: 4.8, initials: 'МН', accent: 'sand', room: '305' },
-    { id: 'doctor-5', name: 'Алина Омарова', specialty: 'Гинеколог', description: 'Деликатные консультации и внимание к каждому этапу жизни.', experienceYears: 12, rating: 4.9, initials: 'АО', accent: 'lilac', room: '210' },
-    { id: 'doctor-6', name: 'Руслан Ибраев', specialty: 'Врач УЗИ', description: 'Точная диагностика и подробные ответы сразу после исследования.', experienceYears: 10, rating: 4.8, initials: 'РИ', accent: 'mint', room: '118' },
-    { id: 'doctor-7', name: 'Гульнара Бекова', specialty: 'Лаборант', description: 'Аккуратный и почти незаметный забор анализов, результаты — в личном кабинете.', experienceYears: 8, rating: 4.9, initials: 'ГБ', accent: 'sage', room: '101' },
-    { id: 'doctor-8', name: 'Ержан Тулегенов', specialty: 'Кардиолог', description: 'Кардиолог-аритмолог. Сейчас в отпуске, запись временно закрыта.', experienceYears: 18, rating: 4.8, initials: 'ЕТ', accent: 'blue', room: '206', active: false },
+    { id: 'doctor-1', name: 'Айгерим Сейтова', specialty: 'Кардиолог', profession: 'physician', description: 'Профилактика и лечение заболеваний сердца. Объясняет сложное простыми словами.', experienceYears: 14, rating: 4.9, initials: 'АС', accent: 'sage', room: '204' },
+    { id: 'doctor-2', name: 'Данияр Ахметов', specialty: 'Невролог', profession: 'physician', description: 'Помогает вернуть спокойный сон, ясность и свободу движения.', experienceYears: 11, rating: 4.9, initials: 'ДА', accent: 'blue', room: '208' },
+    { id: 'doctor-3', name: 'Жанна Ким', specialty: 'Педиатр', profession: 'physician', description: 'Бережно заботится о детях и всегда находит общий язык с родителями.', experienceYears: 16, rating: 5.0, initials: 'ЖК', accent: 'rose', room: '112' },
+    { id: 'doctor-4', name: 'Марат Нурланов', specialty: 'Дерматолог', profession: 'physician', description: 'Доказательный подход к здоровью кожи и её ежедневному уходу.', experienceYears: 9, rating: 4.8, initials: 'МН', accent: 'sand', room: '305' },
+    { id: 'doctor-5', name: 'Алина Омарова', specialty: 'Гинеколог', profession: 'physician', description: 'Деликатные консультации и внимание к каждому этапу жизни.', experienceYears: 12, rating: 4.9, initials: 'АО', accent: 'lilac', room: '210' },
+    { id: 'doctor-6', name: 'Руслан Ибраев', specialty: 'Врач УЗИ', profession: 'physician', description: 'Точная диагностика и подробные ответы сразу после исследования.', experienceYears: 10, rating: 4.8, initials: 'РИ', accent: 'mint', room: '118' },
+    { id: 'doctor-7', name: 'Гульнара Бекова', specialty: 'Лаборант', profession: 'clinical-specialist', description: 'Аккуратный и почти незаметный забор анализов, результаты — в личном кабинете.', experienceYears: 8, rating: 4.9, initials: 'ГБ', accent: 'sage', room: '101' },
+    { id: 'doctor-8', name: 'Ержан Тулегенов', specialty: 'Кардиолог', profession: 'physician', description: 'Кардиолог-аритмолог. Сейчас в отпуске, запись временно закрыта.', experienceYears: 18, rating: 4.8, initials: 'ЕТ', accent: 'blue', room: '206', active: false },
   ]
 
   const patients: Patient[] = [
@@ -74,11 +70,10 @@ export function createSeedDatabase(): MockDatabase {
       name: 'Клиника «Сана»',
       tagline: 'Здоровье начинается с внимания',
       description: 'Мы создали пространство, где современная медицина встречается с человеческим отношением. Внимательно слушаем, объясняем каждый шаг и вместе находим решение.',
-      foundedYear: 2012,
-      address: 'Алматы, проспект Достык, 128',
-      phone: '+7 (727) 355-14-14',
-      email: 'hello@sana-clinic.kz',
-      workingHours: 'Ежедневно, 08:00–20:00',
+      address: '',
+      phone: '',
+      email: '',
+      workingHours: 'Демо-запись · 09:00–17:00',
     },
     doctors,
     services,
@@ -163,8 +158,4 @@ export function createId(prefix: string): string {
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
   return `${prefix}-${id}`
-<<<<<<< HEAD
-=======
->>>>>>> 32a33964d3dfc2c35b3233d1af01f7b8fcfc127e
->>>>>>> 53d41b56e91a232979132ad699ea09408bd59c65
 }

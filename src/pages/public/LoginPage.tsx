@@ -81,7 +81,7 @@ export function LoginPage() {
         </aside>
 
         <section className="login-card">
-          <div className="login-card__heading"><p className="eyebrow">ДЕМО-ДОСТУП</p><h2>Войти в кабинет</h2><p>Это демонстрационный сайт: записи и данные сохраняются только в этом браузере. Выберите роль, чтобы продолжить.</p></div>
+          <div className="login-card__heading"><p className="eyebrow">ДЕМО-ДОСТУП</p><h2>Войти в кабинет</h2><p>Выберите роль, чтобы посмотреть сайт от её имени.</p></div>
           {state?.message && <div className="login-notice" role="status"><span><ShieldCheck size={18} /></span><p>{state.message}</p></div>}
 
           <div className="role-picker" role="group" aria-label="Выберите роль">
@@ -104,8 +104,4 @@ export function LoginPage() {
       </div>
     </main>
   )
-<<<<<<< HEAD
-=======
->>>>>>> 32a33964d3dfc2c35b3233d1af01f7b8fcfc127e
->>>>>>> 53d41b56e91a232979132ad699ea09408bd59c65
 }

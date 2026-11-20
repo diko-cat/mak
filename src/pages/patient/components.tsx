@@ -12,7 +12,7 @@ export function AppointmentTicket({ appointment, doctor, service }: { appointmen
         <div className="ticket__grid">
           <div><p className="ticket__label">Время</p><p className="ticket__value">{formatTime(appointment.startsAt)}</p></div>
           <div><p className="ticket__label">Кабинет</p><p className="ticket__value">{doctor?.room ?? '—'}</p></div>
-          <div className="ticket__wide"><p className="ticket__label">Врач</p><p className="ticket__value">{doctor?.name ?? 'Врач клиники'}</p><p className="ticket__hint">{doctor?.specialty}{service ? ` · ${service.name}` : ''}</p></div>
+          <div className="ticket__wide"><p className="ticket__label">Специалист</p><p className="ticket__value">{doctor?.name ?? 'Специалист клиники'}</p><p className="ticket__hint">{doctor?.specialty}{service ? ` · ${service.name}` : ''}</p></div>
         </div>
       </div>
       <div className="ticket__stub">

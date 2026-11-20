@@ -8,8 +8,8 @@ import { errorMessage, formatDateTime, formatPrice, isSameDay, toDateKey } from 
 
 const tabs: CabinetTab[] = [{ to: '/admin', label: 'Обзор', icon: LayoutDashboard, end: true }]
 
-/** Слотов приёма у врача в день: 09:00–17:00 с шагом 30 минут. */
-const SLOTS_PER_DAY = 17
+/** Полчасовые слоты приёма: 09:00–17:00. */
+const SLOTS_PER_DAY = 16
 
 interface AdminData {
   appointments: Appointment[]
@@ -41,7 +41,7 @@ function AdminOverview({ data }: { data: AdminData }) {
   const today = toDateKey(new Date())
   const todayAppointments = data.appointments.filter((item) => isSameDay(item.startsAt, today) && item.status !== 'cancelled')
   const newRequests = data.callRequests.filter((item) => item.status === 'new')
-  const activeDoctors = data.doctors.filter((doctor) => doctor.active !== false)
+  const activeSpecialists = data.doctors.filter((doctor) => doctor.active !== false)
   const revenue = todayAppointments.reduce((sum, item) => sum + (data.services.find((service) => service.id === item.serviceId)?.price ?? 0), 0)
   const recent = [...data.appointments].sort((left, right) => right.startsAt.localeCompare(left.startsAt)).slice(0, 5)
   const patientName = (id: string) => data.patients.find((patient) => patient.id === id)?.name ?? 'Пациент'
@@ -50,7 +50,7 @@ function AdminOverview({ data }: { data: AdminData }) {
   const stats: [string, string | number][] = [
     ['Записей сегодня', todayAppointments.length],
     ['Новых заявок', newRequests.length],
-    ['Врачей принимает', activeDoctors.length],
+    ['Специалистов принимает', activeSpecialists.length],
     ['Ожидаемая выручка', formatPrice(revenue)],
   ]
 
@@ -60,10 +60,15 @@ function AdminOverview({ data }: { data: AdminData }) {
         {stats.map(([label, value]) => <div key={label} className="admin-stat"><small>{label}</small><strong>{value}</strong></div>)}
       </div>
 
-      <Panel title="Загрузка врачей сегодня" className="cabinet-grid__wide">
+      <Panel title="Загрузка специалистов сегодня" className="cabinet-grid__wide">
         <ul className="admin-list">
-          {activeDoctors.map((doctor) => {
-            const count = todayAppointments.filter((item) => item.doctorId === doctor.id).length
+          {activeSpecialists.map((doctor) => {
+            const count = todayAppointments
+              .filter((item) => item.doctorId === doctor.id)
+              .reduce((total, item) => {
+                const duration = data.services.find((service) => service.id === item.serviceId)?.durationMinutes ?? 30
+                return total + Math.ceil(duration / 30)
+              }, 0)
             return (
               <li key={doctor.id} className="admin-load">
                 <span><strong>{doctor.name}</strong><small className="muted"> · {doctor.specialty}</small></span>

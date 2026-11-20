@@ -1,15 +1,31 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { createAppointment, getDaySlots } from '../../api'
+import { createAppointment, getCalendarAvailability, getDaySlots } from '../../api'
 import { Button, buttonStyles } from '../../components/ui'
 import type { Appointment, DaySlot } from '../../types'
 import { EmptyState, LoadingNote, Panel } from '../cabinet/CabinetLayout'
-import { addDays, errorMessage, formatPrice, formatTime, longDayFormat, shortDateFormat, toDateKey, weekdayFormat } from '../cabinet/format'
+import { addDays, errorMessage, formatPrice, formatTime, longDayFormat, toDateKey, weekdayFormat } from '../cabinet/format'
 import { AppointmentTicket } from './components'
 import type { usePatientData } from './usePatientData'
 
-const BOOKING_DAYS = 7
+const BOOKING_DAYS = 60
+const monthFormat = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' })
+const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+
+function startOfMonth(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), 1)
+}
+
+function monthCells(month: Date): (Date | null)[] {
+  const first = startOfMonth(month)
+  const offset = (first.getDay() + 6) % 7
+  const daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()
+  return [
+    ...Array.from({ length: offset }, () => null),
+    ...Array.from({ length: daysInMonth }, (_, index) => new Date(first.getFullYear(), first.getMonth(), index + 1)),
+  ]
+}
 
 export function PatientBooking({ patient, patientId }: { patient: ReturnType<typeof usePatientData>; patientId: string }) {
   const { data, reload, doctorOf, serviceOf } = patient
@@ -17,21 +33,47 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
   const [doctorId, setDoctorId] = useState('')
   const [date, setDate] = useState('')
   const [slot, setSlot] = useState('')
+  const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(new Date()))
   const [reason, setReason] = useState('')
   const [slots, setSlots] = useState<DaySlot[]>([])
+  const [availability, setAvailability] = useState<Record<string, number>>({})
+  const [calendarLoading, setCalendarLoading] = useState(false)
+  const [calendarError, setCalendarError] = useState('')
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [slotsVersion, setSlotsVersion] = useState(0)
+  const [calendarVersion, setCalendarVersion] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [created, setCreated] = useState<Appointment | null>(null)
 
-  const days = useMemo(() => Array.from({ length: BOOKING_DAYS }, (_, index) => addDays(index)), [])
+  const bookingDays = useMemo(() => Array.from({ length: BOOKING_DAYS }, (_, index) => addDays(index)), [])
+  const bookingDateKeys = useMemo(() => bookingDays.map(toDateKey), [bookingDays])
+  const calendarDates = useMemo(() => monthCells(visibleMonth), [visibleMonth])
+  const firstMonth = startOfMonth(bookingDays[0])
+  const lastMonth = startOfMonth(bookingDays[bookingDays.length - 1])
   const service = serviceOf(serviceId)
   const doctor = doctorOf(doctorId)
   const doctors = useMemo(
     () => (data?.doctors ?? []).filter((entry) => entry.active !== false && (!service?.specialty || entry.specialty === service.specialty)),
     [data, service],
   )
+
+  useEffect(() => {
+    if (!doctorId || !service) {
+      setAvailability({})
+      setCalendarLoading(false)
+      setCalendarError('')
+      return
+    }
+    let active = true
+    setCalendarLoading(true)
+    setCalendarError('')
+    getCalendarAvailability(doctorId, bookingDateKeys, service.durationMinutes)
+      .then((result) => { if (active) setAvailability(result) })
+      .catch((availabilityError: unknown) => { if (active) setCalendarError(errorMessage(availabilityError, 'Не удалось загрузить свободные даты.')) })
+      .finally(() => { if (active) setCalendarLoading(false) })
+    return () => { active = false }
+  }, [doctorId, service, bookingDateKeys, calendarVersion])
 
   useEffect(() => {
     if (!doctorId || !date || !service) return
@@ -47,13 +89,33 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
   if (!data) return <LoadingNote />
 
   function chooseService(id: string) {
-    setServiceId(id); setDoctorId(''); setDate(''); setSlot(''); setSlots([]); setError('')
+    setServiceId(id)
+    setDoctorId('')
+    setDate('')
+    setSlot('')
+    setSlots([])
+    setAvailability({})
+    setVisibleMonth(firstMonth)
+    setError('')
   }
   function chooseDoctor(id: string) {
-    setDoctorId(id); setDate(''); setSlot(''); setSlots([]); setError('')
+    setDoctorId(id)
+    setDate('')
+    setSlot('')
+    setSlots([])
+    setAvailability({})
+    setVisibleMonth(firstMonth)
+    setError('')
   }
   function chooseDate(key: string) {
-    setDate(key); setSlot(''); setSlots([]); setError('')
+    if ((availability[key] ?? 0) < 1) return
+    setDate(key)
+    setSlot('')
+    setSlots([])
+    setError('')
+  }
+  function changeMonth(offset: number) {
+    setVisibleMonth((month) => new Date(month.getFullYear(), month.getMonth() + offset, 1))
   }
 
   const ready = Boolean(service && doctor && date && slot && reason.trim())
@@ -70,6 +132,7 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
       setError(errorMessage(bookingError, 'Не удалось создать запись.'))
       setSlot('')
       setSlotsVersion((value) => value + 1)
+      setCalendarVersion((value) => value + 1)
     } finally {
       setSubmitting(false)
     }
@@ -105,13 +168,13 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
           </div>
         </Panel>
 
-        <Panel title={<><span className="step-index">2</span>Врач</>}>
-          {!service ? <EmptyState>Сначала выберите услугу.</EmptyState> : doctors.length === 0 ? <EmptyState>Сейчас нет врачей, которые принимают по этой услуге.</EmptyState> : (
+        <Panel title={<><span className="step-index">2</span>Специалист</>}>
+          {!service ? <EmptyState>Сначала выберите услугу.</EmptyState> : doctors.length === 0 ? <EmptyState>Сейчас нет специалистов, которые принимают по этой услуге.</EmptyState> : (
             <div className="choice-grid">
               {doctors.map((entry) => (
                 <button key={entry.id} type="button" className={`choice choice--doctor ${doctorId === entry.id ? 'choice--active' : ''}`} aria-pressed={doctorId === entry.id} onClick={() => chooseDoctor(entry.id)}>
                   <span className="avatar" aria-hidden="true">{entry.initials}</span>
-                  <span><strong>{entry.name}</strong><small>{entry.specialty} · стаж {entry.experienceYears} лет · ★ {entry.rating.toFixed(1)}</small></span>
+                  <span><strong>{entry.name}</strong><small>{entry.specialty} · стаж {entry.experienceYears} лет</small></span>
                 </button>
               ))}
             </div>
@@ -119,16 +182,47 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
         </Panel>
 
         <Panel title={<><span className="step-index">3</span>Дата</>}>
-          {!doctor ? <EmptyState>Выберите врача, чтобы увидеть даты.</EmptyState> : (
-            <div className="day-strip">
-              {days.map((day) => {
-                const key = toDateKey(day)
-                return (
-                  <button key={key} type="button" className={`day ${date === key ? 'day--active' : ''}`} aria-pressed={date === key} onClick={() => chooseDate(key)}>
-                    <small>{weekdayFormat.format(day)}</small><strong>{day.getDate()}</strong><small>{shortDateFormat.format(day).replace(/^\d+\s*/, '')}</small>
-                  </button>
-                )
-              })}
+          {!doctor ? <EmptyState>Выберите специалиста, чтобы увидеть даты.</EmptyState> : (
+            <div className="booking-calendar" role="group" aria-label="Свободные даты на ближайшие два месяца">
+              <div className="booking-calendar__header">
+                <strong>{monthFormat.format(visibleMonth)}</strong>
+                <div className="booking-calendar__controls">
+                  <button type="button" aria-label="Предыдущий месяц" disabled={visibleMonth.getTime() <= firstMonth.getTime()} onClick={() => changeMonth(-1)}><ArrowLeft size={16} /></button>
+                  <button type="button" aria-label="Следующий месяц" disabled={visibleMonth.getTime() >= lastMonth.getTime()} onClick={() => changeMonth(1)}><ArrowRight size={16} /></button>
+                </div>
+              </div>
+              <div className="booking-calendar__grid booking-calendar__weekdays" aria-hidden="true">
+                {weekDays.map((day) => <span key={day}>{day}</span>)}
+              </div>
+              <div className="booking-calendar__grid">
+                {calendarDates.map((day, index) => {
+                  if (!day) return <span key={`blank-${index}`} className="booking-calendar__blank" />
+                  const key = toDateKey(day)
+                  const availableCount = availability[key] ?? 0
+                  const inBookingWindow = key >= bookingDateKeys[0] && key <= bookingDateKeys[bookingDateKeys.length - 1]
+                  const isAvailable = inBookingWindow && availableCount > 0
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`booking-calendar__day ${isAvailable ? 'booking-calendar__day--available' : ''} ${date === key ? 'booking-calendar__day--selected' : ''}`}
+                      disabled={!isAvailable || calendarLoading}
+                      aria-pressed={date === key}
+                      aria-label={`${weekdayFormat.format(day)} ${day.getDate()} ${monthFormat.format(day)}${isAvailable ? ', есть свободное время' : ', свободного времени нет'}`}
+                      title={isAvailable ? 'Есть свободное время' : 'Свободного времени нет'}
+                      onClick={() => chooseDate(key)}
+                    >
+                      <span>{day.getDate()}</span>
+                      {isAvailable && <i aria-hidden="true" />}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="booking-calendar__legend"><i aria-hidden="true" />Есть свободное время</p>
+              <p className="booking-calendar__horizon">Показываем доступность на ближайшие 60 дней.</p>
+              {calendarLoading && <LoadingNote>Проверяем свободные даты…</LoadingNote>}
+              {calendarError && <p className="form-message form-message--error" role="alert">{calendarError}</p>}
+              {!calendarLoading && !calendarError && Object.keys(availability).length > 0 && !Object.values(availability).some((count) => count > 0) && <EmptyState>На ближайшие два месяца свободных дат нет.</EmptyState>}
             </div>
           )}
         </Panel>
@@ -168,7 +262,7 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
         <p className="eyebrow">ВАША ЗАПИСЬ</p>
         <dl>
           <div><dt>Услуга</dt><dd>{service?.name ?? '—'}</dd></div>
-          <div><dt>Врач</dt><dd>{doctor ? `${doctor.name}, ${doctor.specialty.toLowerCase()}` : '—'}</dd></div>
+          <div><dt>Специалист</dt><dd>{doctor ? `${doctor.name}, ${doctor.specialty.toLowerCase()}` : '—'}</dd></div>
           <div><dt>Дата</dt><dd>{date ? longDayFormat.format(new Date(`${date}T00:00:00`)) : '—'}</dd></div>
           <div><dt>Время</dt><dd>{slot ? formatTime(slot) : '—'}</dd></div>
           <div><dt>Кабинет</dt><dd>{doctor?.room ?? '—'}</dd></div>
