@@ -65,12 +65,6 @@ export function HomePage() {
     }
   }, [location.state])
 
-<<<<<<< HEAD
-  const isPatient = user?.role === 'patient'
-  const bookTarget = isPatient ? '/patient/appointments/new' : '/login?role=patient'
-  const bookState = isPatient ? undefined : {
-    message: 'Это демонстрационная запись. Войдите в демо-аккаунт пациента, чтобы выбрать услугу, врача и свободное время.',
-=======
   // Вступительная анимация первого экрана
   useEffect(() => {
     const mm = gsap.matchMedia()
@@ -86,10 +80,10 @@ export function HomePage() {
   useReveal('.service-row', [services.length])
   useReveal('.doctor-card', [doctors.length])
 
-  const bookTarget = user ? '/patient/appointments/new' : '/login'
-  const bookState = user ? undefined : {
-    message: 'Войдите в демо-аккаунт пациента, чтобы выбрать врача и время приёма.',
->>>>>>> 53d41b56e91a232979132ad699ea09408bd59c65
+  const isPatient = user?.role === 'patient'
+  const bookTarget = isPatient ? '/patient/appointments/new' : '/login?role=patient'
+  const bookState = isPatient ? undefined : {
+    message: 'Это демонстрационная запись. Войдите в демо-аккаунт пациента, чтобы выбрать услугу, врача и свободное время.',
     from: { pathname: '/patient/appointments/new' },
   }
 
@@ -274,8 +268,4 @@ export function HomePage() {
       </main>
     </>
   )
-<<<<<<< HEAD
-=======
->>>>>>> 32a33964d3dfc2c35b3233d1af01f7b8fcfc127e
->>>>>>> 53d41b56e91a232979132ad699ea09408bd59c65
 }
