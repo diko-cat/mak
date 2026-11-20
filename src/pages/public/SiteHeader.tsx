@@ -65,11 +65,7 @@ export function SiteHeader() {
               <button className="header-account__logout" type="button" onClick={signOut}>Выйти</button>
             </div>
           ) : (
-<<<<<<< HEAD
-            <Link className="button button--secondary header-login" to="/login">Войти <ArrowUpRight size={15} /></Link>
-=======
             <Link className="button button--secondary header-login" to="/login"><span className="header-login__full">Демо-вход</span><span className="header-login__short">Войти</span> <ArrowUpRight size={15} /></Link>
->>>>>>> faa8dcf98c9e6f80c9c31b60de74d202dca5f587
           )}
         </div>
       </div>

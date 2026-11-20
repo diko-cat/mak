@@ -325,8 +325,6 @@ export async function createCallRequest(input: CreateCallRequestInput): Promise<
   writeDatabase(database)
   return request
 }
-<<<<<<< HEAD
-=======
 
 export async function updateCallRequestStatus(id: string, status: CallRequest['status']): Promise<CallRequest> {
   requirePermission('calls:manage')
@@ -499,4 +497,3 @@ export async function deleteService(id: string): Promise<void> {
   database.services = database.services.filter((entry) => entry.id !== id)
   writeDatabase(database)
 }
->>>>>>> faa8dcf98c9e6f80c9c31b60de74d202dca5f587

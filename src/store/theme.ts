@@ -12,14 +12,10 @@ let currentTheme = readTheme()
 const listeners = new Set<() => void>()
 
 function applyTheme(theme: Theme): void {
-<<<<<<< HEAD
-  if (typeof document !== 'undefined') document.documentElement.dataset.theme = theme
-=======
   if (typeof document !== 'undefined') {
     document.documentElement.dataset.theme = theme
     document.documentElement.classList.toggle('dark', theme === 'dark')
   }
->>>>>>> faa8dcf98c9e6f80c9c31b60de74d202dca5f587
 }
 
 function emitChange(): void {
