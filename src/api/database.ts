@@ -3,10 +3,6 @@ import type {
   CallRequest,
   Clinic,
   DemoAccount,
-<<<<<<< HEAD
-=======
->>>>>>> 32a33964d3dfc2c35b3233d1af01f7b8fcfc127e
->>>>>>> 53d41b56e91a232979132ad699ea09408bd59c65
   Doctor,
   LabTest,
   MedicalConclusion,
@@ -163,8 +159,4 @@ export function createId(prefix: string): string {
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
   return `${prefix}-${id}`
-<<<<<<< HEAD
-=======
->>>>>>> 32a33964d3dfc2c35b3233d1af01f7b8fcfc127e
->>>>>>> 53d41b56e91a232979132ad699ea09408bd59c65
 }

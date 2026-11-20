@@ -1,25 +1,14 @@
 {
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
-<<<<<<< HEAD
-    "target": "ES2020",
-    "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-=======
     "target": "ES2022",
     "useDefineForClassFields": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
->>>>>>> 32a33964d3dfc2c35b3233d1af01f7b8fcfc127e
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
-<<<<<<< HEAD
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-=======
     "verbatimModuleSyntax": true,
->>>>>>> 32a33964d3dfc2c35b3233d1af01f7b8fcfc127e
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
