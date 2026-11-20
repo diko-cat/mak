@@ -14,6 +14,7 @@ import {
   MessageCircleHeart,
   Microscope,
   Phone,
+  Sparkles,
   ShieldCheck,
   Stethoscope,
   UsersRound,
