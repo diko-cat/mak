@@ -80,9 +80,10 @@ export function HomePage() {
   useReveal('.service-row', [services.length])
   useReveal('.doctor-card', [doctors.length])
 
-  const bookTarget = user ? '/patient/appointments/new' : '/login'
-  const bookState = user ? undefined : {
-    message: 'Войдите в демо-аккаунт пациента, чтобы выбрать врача и время приёма.',
+  const isPatient = user?.role === 'patient'
+  const bookTarget = isPatient ? '/patient/appointments/new' : '/login?role=patient'
+  const bookState = isPatient ? undefined : {
+    message: 'Это демонстрационная запись. Войдите в демо-аккаунт пациента, чтобы выбрать услугу, врача и свободное время.',
     from: { pathname: '/patient/appointments/new' },
   }
 
@@ -111,7 +112,7 @@ export function HomePage() {
               <h1>Здоровье начинается <span>с внимания.</span></h1>
               <p className="hero-lead">Внимательные врачи, понятные решения и забота, которая остаётся с вами после приёма.</p>
               <div className="hero-actions">
-                <Link className={buttonStyles('primary', 'button--large')} to={bookTarget} state={bookState}>Записаться на приём <ArrowRight size={17} /></Link>
+                <Link className={buttonStyles('primary', 'button--large')} to={bookTarget} state={bookState}>Записаться · демо <ArrowRight size={17} /></Link>
                 <a className="text-link" href="#about">Узнать о клинике <ArrowDown size={15} /></a>
               </div>
               <div className="hero-proof">
@@ -178,7 +179,7 @@ export function HomePage() {
                 <p className="eyebrow">БЕЗ НЕОЖИДАННОСТЕЙ</p>
                 <h3>Всё важное — заранее</h3>
                 <p>Врач расскажет, какие исследования действительно нужны, и согласует каждый следующий шаг.</p>
-                <Link to={bookTarget} state={bookState}>Выбрать специалиста <ArrowRight size={15} /></Link>
+                <Link to={bookTarget} state={bookState}>Выбрать специалиста · демо <ArrowRight size={15} /></Link>
                 <span className="services-intro-card__decoration"><Activity size={66} strokeWidth={1} /></span>
               </div>
               <div className="services-list">
@@ -187,7 +188,7 @@ export function HomePage() {
                     <span className="service-index">{String(index + 1).padStart(2, '0')}</span>
                     <div className="service-row__copy"><h3>{service.name}</h3><p>{service.description}</p></div>
                     <strong className="service-price">{currency.format(service.price)} <small>₸</small></strong>
-                    <Link className="service-row__arrow" to={bookTarget} state={bookState} aria-label={`Записаться: ${service.name}`}><ArrowUpRight size={16} /></Link>
+                    <Link className="service-row__arrow" to={bookTarget} state={bookState} aria-label={`Демо-запись: ${service.name}`}><ArrowUpRight size={16} /></Link>
                   </article>
                 ))}
                 {services.length === 0 && <p className="loading-note">Загружаем список услуг…</p>}
@@ -207,7 +208,7 @@ export function HomePage() {
                     <span className="doctor-order">0{index + 1}</span>
                     <span className="doctor-rating">✦ {doctor.rating.toFixed(1)}</span>
                   </div>
-                  <div className="doctor-card__body"><p className="eyebrow">{doctor.specialty}</p><h3>{doctor.name}</h3><p>{doctor.experienceYears} лет практики</p><Link to={bookTarget} state={bookState}>Записаться <ArrowUpRight size={15} /></Link></div>
+                  <div className="doctor-card__body"><p className="eyebrow">{doctor.specialty}</p><h3>{doctor.name}</h3><p>{doctor.experienceYears} лет практики</p><Link to={bookTarget} state={bookState}>Записаться · демо <ArrowUpRight size={15} /></Link></div>
                 </article>
               ))}
               {doctors.length === 0 && <p className="loading-note">Загружаем команду…</p>}
@@ -221,14 +222,14 @@ export function HomePage() {
               <Badge tone="white"><span className="badge-dot" /> ПРОСТО И БЕЗОПАСНО</Badge>
               <h2>Забота — <em>в ваших руках.</em></h2>
               <p>У каждого свой удобный доступ: нужная информация всегда под рукой.</p>
-              <Link className="button button--light" to="/login">Войти в кабинет <ArrowUpRight size={15} /></Link>
+              <Link className="button button--light" to="/login">Демо-вход в кабинет <ArrowUpRight size={15} /></Link>
             </div>
             <div className="access-roles">
-              {roles.map(({ title, description, icon: Icon, tone }, index) => (
+              {roles.map(({ title, description, icon: Icon, tone }) => (
                 <Link className="access-role" key={title} to={`/login?role=${title === 'Пациент' ? 'patient' : title === 'Врач' ? 'doctor' : title === 'Администратор' ? 'admin' : 'patient'}`}>
                   <span className={`access-role__icon access-role__icon--${tone}`}><Icon size={18} /></span>
                   <span className="access-role__copy"><strong>{title}</strong><small>{description}</small></span>
-                  <span className="access-role__number">0{index + 1}</span>
+                  <span className="access-role__number">Демо</span>
                   <ArrowUpRight className="access-role__arrow" size={16} />
                 </Link>
               ))}
@@ -242,7 +243,7 @@ export function HomePage() {
             <div className="contact-copy">
               <p className="eyebrow">МЫ НА СВЯЗИ</p>
               <h2>Есть вопрос?<br /><em>Давайте обсудим.</em></h2>
-              <p>Оставьте номер — администратор позвонит, ответит на вопросы и поможет выбрать удобное время.</p>
+              <p>Оставьте номер, чтобы сохранить демонстрационную заявку и посмотреть этот сценарий.</p>
               <div className="contact-details">
                 <a href={`tel:${clinic?.phone ?? '+77273551414'}`}><span><Phone size={17} /></span><div><small>ПОЗВОНИТЕ НАМ</small><strong>{clinic?.phone ?? '+7 (727) 355-14-14'}</strong></div><ArrowUpRight size={15} /></a>
                 <div><span><MapPin size={17} /></span><div><small>МЫ НАХОДИМСЯ</small><strong>{clinic?.address ?? 'Алматы, проспект Достык, 128'}</strong></div></div>
@@ -256,8 +257,8 @@ export function HomePage() {
               <label className="form-field"><span>Ваше имя</span><input required minLength={2} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Например, Алия" autoComplete="name" /></label>
               <label className="form-field"><span>Номер телефона</span><input required type="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="+7 (___) ___-__-__" autoComplete="tel" /></label>
               <label className="form-field"><span>Когда удобнее позвонить <small>необязательно</small></span><select value={form.preferredTime} onChange={(event) => setForm({ ...form, preferredTime: event.target.value })}><option value="">Выберите время</option><option>Утром, 08:00–12:00</option><option>Днём, 12:00–17:00</option><option>Вечером, 17:00–20:00</option></select></label>
-              <Button className="callback-submit" type="submit" disabled={requestState === 'sending'}>{requestState === 'sending' ? 'Отправляем…' : 'Жду звонка'} <ArrowRight size={17} /></Button>
-              {requestState === 'success' && <p className="form-message form-message--success" role="status"><Check size={16} /> Заявка сохранена. Мы скоро с вами свяжемся.</p>}
+              <Button className="callback-submit" type="submit" disabled={requestState === 'sending'}>{requestState === 'sending' ? 'Сохраняем…' : 'Сохранить демо-заявку'} <ArrowRight size={17} /></Button>
+              {requestState === 'success' && <p className="form-message form-message--success" role="status"><Check size={16} /> Демо-заявка сохранена в этом браузере. Реальный звонок не выполняется.</p>}
               {requestState === 'error' && <p className="form-message form-message--error" role="alert">{requestError}</p>}
               <small className="form-privacy">Нажимая кнопку, вы соглашаетесь на обработку персональных данных.</small>
             </form>

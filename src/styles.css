@@ -430,6 +430,7 @@ button { color: inherit; }
 .theme-toggle { width: 42px; height: 42px; }
 .header-login, .header-account__link { min-height: 42px; padding-inline: 16px; font-size: 13px; }
 .header-account__logout { font-size: 13px; }
+.header-login__short { display: none; }
 
 .button { min-height: 46px; padding-inline: 20px; border-radius: 12px; }
 .button svg { transition: transform .2s ease; }
@@ -719,6 +720,8 @@ button { color: inherit; }
   .theme-toggle { flex: 0 0 auto; width: 40px; height: 40px; }
   .header-login, .header-account__link { flex: 0 0 auto; min-height: 40px; padding-inline: 12px; }
   .header-login svg, .header-account__link svg { display: none; }
+  .header-login__full { display: none; }
+  .header-login__short { display: inline; }
   .hero-copy h1 { font-size: clamp(38px, 11.4vw, 50px); overflow-wrap: anywhere; }
   .access-panel { width: 100%; padding-inline: 16px; }
 }
