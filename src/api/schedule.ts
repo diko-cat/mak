@@ -77,3 +77,22 @@ export function daysOffUntil(doctor: Doctor, fromKey: string): string | null {
     last = key
   }
 }
+
+/** От самого раннего начала до самого позднего конца; `null`, если интервалов нет. */
+function span(intervals: (WorkingInterval | null | undefined)[]): WorkingInterval | null {
+  const present = intervals.filter((interval): interval is WorkingInterval => Boolean(interval))
+  if (!present.length) return null
+  return {
+    start: present.map((interval) => interval.start).sort()[0],
+    end: present.map((interval) => interval.end).sort().at(-1)!,
+  }
+}
+
+/** Часы работы клиники по дням: объединение графиков активных врачей. */
+export function clinicWorkingHours(doctors: Doctor[]): WorkingHours {
+  const hours = doctors.filter((doctor) => doctor.active !== false).map((doctor) => doctor.workingHours ?? defaultWorkingHours())
+  return Object.fromEntries(WEEK_ORDER.map((day) => [day, span(hours.map((entry) => entry[day]))])) as WorkingHours
+}
+
+/** Самое раннее начало и самый поздний конец приёма за неделю. */
+export const workingRange = (hours: WorkingHours) => span(WEEK_ORDER.map((day) => hours[day]))

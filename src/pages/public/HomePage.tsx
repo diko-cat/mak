@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ArrowDown, ArrowRight, ArrowUpRight, CalendarDays, Check, Heart, Sparkles, Stethoscope, UsersRound } from 'lucide-react'
 import gsap from 'gsap'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { clinicWorkingHours, workingRange } from '../../api/schedule'
 import { Badge, buttonStyles } from '../../components/ui'
 import { useReveal } from '../../hooks/useReveal'
 import { BookLink } from './BookLink'
@@ -20,6 +21,7 @@ export function HomePage() {
   const { clinic, doctors, services } = usePublicData()
   const [notice, setNotice] = useState('')
   const activePhysicians = doctors.filter(isPhysician)
+  const hoursRange = workingRange(clinicWorkingHours(doctors))
 
   useEffect(() => {
     const message = (location.state as { notice?: string } | null)?.notice
@@ -86,7 +88,7 @@ export function HomePage() {
           <div className="container hero-metrics">
             <div><strong>{clinic?.foundedYear ?? 'Уточняется'}</strong><span>год основания клиники</span></div>
             <div><strong>{activePhysicians.length}</strong><span>принимающих врачей</span></div>
-            <div><strong>09:00 <i>—</i> 17:00</strong><span>доступные слоты демо-записи</span></div>
+            <div><strong>{hoursRange ? <>{hoursRange.start} <i>—</i> {hoursRange.end}</> : '—'}</strong><span>часы приёма врачей</span></div>
             <a href="#services">Знакомьтесь с клиникой <ArrowDown size={14} /></a>
           </div>
         </section>
@@ -117,7 +119,7 @@ export function HomePage() {
           </div>
         </section>
 
-        <ContactsSection clinic={clinic} />
+        <ContactsSection clinic={clinic} doctors={doctors} />
         <div className="closing-strip"><div className="container"><span><Heart size={16} fill="currentColor" /> Берегите себя. Мы рядом.</span><a href="#top">К началу страницы <ArrowUpRight size={14} /></a></div></div>
       </main>
     </>

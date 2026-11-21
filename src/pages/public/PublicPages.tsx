@@ -17,6 +17,6 @@ export function DoctorsPage() {
 }
 
 export function ContactsPage() {
-  const { clinic } = usePublicData()
-  return <main className="public-page"><ContactsSection clinic={clinic} page /></main>
+  const { clinic, doctors } = usePublicData()
+  return <main className="public-page"><ContactsSection clinic={clinic} doctors={doctors} page /></main>
 }
