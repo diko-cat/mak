@@ -99,8 +99,6 @@ button { color: inherit; }
 .mobile-menu nav a:hover { color: var(--green); background: var(--surface-alt); }
 .site-header__actions { display: flex; align-items: center; gap: 10px; }
 .demo-role-switcher { display: flex; align-items: center; gap: 7px; padding: 0 10px; height: 38px; border: 1px solid var(--line); border-radius: 99px; color: var(--muted); background: var(--surface); }
-.demo-role-switcher select { width: 94px; padding: 0; border: 0; outline: 0; color: var(--ink); background: transparent; font-size: 15px; font-weight: 650; cursor: pointer; }
-.demo-role-switcher option { color: #1d3731; }
 .theme-toggle { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 50%; color: var(--ink); background: var(--surface); cursor: pointer; transition: border-color .2s, transform .2s; }
 .theme-toggle:hover { transform: rotate(-12deg); border-color: var(--green); }
 .button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 43px; padding: 0 17px; border: 1px solid transparent; border-radius: 7px; font-size: 15px; font-weight: 700; letter-spacing: .005em; cursor: pointer; transition: background .2s, border-color .2s, color .2s, transform .2s; }
@@ -442,7 +440,6 @@ button { color: inherit; }
 .site-nav a::after { position: absolute; right: 0; bottom: 0; left: 0; height: 2px; border-radius: 2px; background: var(--green); content: ""; transform: scaleX(0); transform-origin: left; transition: transform .25s ease; }
 .site-nav a:hover::after { transform: scaleX(1); }
 .demo-role-switcher { height: 42px; padding-inline: 12px; }
-.demo-role-switcher select { width: 118px; font-size: 13px; }
 .theme-toggle { width: 42px; height: 42px; }
 .header-login, .header-account__link { min-height: 42px; padding-inline: 16px; font-size: 13px; }
 .header-account__logout { font-size: 13px; }
@@ -574,7 +571,6 @@ button { color: inherit; }
   .brand__text > span { display: none; }
   .demo-role-switcher { padding-inline: 8px; }
   .demo-role-switcher svg { display: none; }
-  .demo-role-switcher select { width: auto; max-width: 124px; }
   .header-account__logout { white-space: nowrap; }
   .hero-grid { min-height: 405px; gap: 22px; }
   .hero-art { min-height: 390px; }
@@ -643,7 +639,6 @@ button { color: inherit; }
   .mobile-menu summary { width: 34px; height: 34px; }
   .demo-role-switcher { height: 34px; gap: 4px; padding-inline: 7px; }
   .demo-role-switcher svg { width: 13px; }
-  .demo-role-switcher select { width: 77px; font-size: 13px; }
   .theme-toggle { width: 34px; height: 34px; }
   .header-login { min-height: 34px; padding-inline: 9px; gap: 3px; font-size: 13px; }
   .header-login svg { width: 13px; }
@@ -734,7 +729,6 @@ button { color: inherit; }
   .site-header__actions { flex: 0 1 auto; min-width: 0; gap: 6px; }
   .demo-role-switcher { flex: 0 1 auto; min-width: 0; height: 40px; padding-inline: 8px 4px; }
   .demo-role-switcher svg { display: none; }
-  .demo-role-switcher select { width: auto; max-width: 124px; min-width: 0; font-size: 13px; text-overflow: ellipsis; }
   .theme-toggle { flex: 0 0 auto; width: 40px; height: 40px; }
   .header-login, .header-account__link { flex: 0 0 auto; min-height: 40px; padding-inline: 12px; }
   .header-login svg, .header-account__link svg { display: none; }
@@ -747,7 +741,6 @@ button { color: inherit; }
   .brand__text { font-size: 17px; }
   .site-header__actions { gap: 4px; }
   .demo-role-switcher { padding-inline: 6px 2px; }
-  .demo-role-switcher select { max-width: 122px; font-size: 12px; }
   .header-login, .header-account__link { padding-inline: 10px; }
 }
 
@@ -831,4 +824,24 @@ button.footer-top-link { padding: 0; border: 0; background: transparent; cursor:
 .booking-toast div { display: flex; gap: 8px; }
 .booking-toast a, .booking-toast button { padding: 8px 12px; border: 1px solid var(--line); border-radius: 99px; color: var(--green); background: transparent; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .booking-toast a { color: var(--surface); background: var(--green); border-color: var(--green); }
-.demo-role-switcher select { width: auto; }
+
+/* Меню «Войти как…» */
+.role-menu { position: relative; }
+.demo-role-switcher { color: var(--ink); font: inherit; font-size: 14px; font-weight: 650; white-space: nowrap; cursor: pointer; transition: border-color .2s, background .2s; }
+.demo-role-switcher:hover, .demo-role-switcher[aria-expanded="true"] { border-color: var(--green); background: var(--surface-alt); }
+.demo-role-switcher > svg:first-child { color: var(--green); }
+.role-menu__chevron { color: var(--muted); transition: transform .2s ease; }
+.demo-role-switcher[aria-expanded="true"] .role-menu__chevron { transform: rotate(180deg); }
+.role-menu__list { position: absolute; z-index: 50; top: calc(100% + 10px); right: 0; display: grid; gap: 2px; width: 280px; padding: 8px; border: 1px solid var(--line); border-radius: 16px; color: var(--ink); background: var(--surface); box-shadow: var(--shadow-lg); animation: role-menu-in .16s ease-out; }
+@keyframes role-menu-in { from { opacity: 0; transform: translateY(-4px); } }
+.role-menu__hint { margin: 2px 8px 8px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.role-menu__item { display: flex; align-items: center; gap: 11px; width: 100%; padding: 9px 8px; border: 0; border-radius: 10px; color: var(--ink); background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.role-menu__item:hover:not(:disabled), .role-menu__item:focus-visible { outline: none; background: var(--surface-alt); }
+.role-menu__item:disabled { cursor: default; background: var(--green-soft); }
+.role-menu__icon { display: grid; flex: none; width: 34px; height: 34px; place-items: center; border-radius: 10px; color: var(--green); background: var(--green-soft); }
+.role-menu__item:disabled .role-menu__icon { background: var(--surface); }
+.role-menu__copy { display: grid; gap: 2px; min-width: 0; }
+.role-menu__copy strong { color: var(--ink-strong); font-size: 14px; font-weight: 700; }
+.role-menu__copy small { color: var(--muted); font-size: 12px; }
+.role-menu__check { margin-left: auto; color: var(--green); }
+@media (prefers-reduced-motion: reduce) { .role-menu__list { animation: none; } }

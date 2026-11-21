@@ -1,15 +1,10 @@
-import { ArrowUpRight, Menu, Moon, Sun, UserRound } from 'lucide-react'
+import { ArrowUpRight, Menu, Moon, Sun } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useSession, clearSession } from '../../store/session'
 import { toggleTheme, useTheme } from '../../store/theme'
 import type { Role } from '../../types'
-
-const roleNames: Record<Role, string> = {
-  patient: 'Пациент',
-  doctor: 'Врач',
-  admin: 'Администратор',
-}
+import { RoleMenu } from './RoleMenu'
 
 export const siteLinks = [
   { to: '/about', label: 'О клинике' },
@@ -63,17 +58,7 @@ export function SiteHeader() {
         </details>
 
         <div className="site-header__actions">
-          <label className="demo-role-switcher" title={user ? `Сейчас вы вошли как «${roleNames[user.role]}». Выбор другой роли завершит текущий вход.` : 'Войти в демо-кабинет от имени роли'}>
-            <UserRound size={15} aria-hidden="true" />
-            <select
-              aria-label="Войти как…"
-              value=""
-              onChange={(event) => switchRole(event.target.value as Role)}
-            >
-              <option value="" disabled hidden>Войти как…</option>
-              {Object.entries(roleNames).map(([role, name]) => <option key={role} value={role}>{name}{user?.role === role ? ' (сейчас)' : ''}</option>)}
-            </select>
-          </label>
+          <RoleMenu currentRole={user?.role} onSelect={switchRole} />
           <button className="theme-toggle" type="button" onClick={toggleTheme} aria-label={theme === 'light' ? 'Включить тёмную тему' : 'Включить светлую тему'}>
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </button>
