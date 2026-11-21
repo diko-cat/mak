@@ -316,8 +316,43 @@
   .admin-row { flex-wrap: wrap; }
 }
 
-/* Шаги записи появляются по очереди */
-.booking-step { scroll-margin-top: 100px; animation: booking-step-in .3s ease-out; }
-@keyframes booking-step-in { from { opacity: 0; transform: translateY(8px); } }
-@media (prefers-reduced-motion: reduce) { .booking-step { animation: none; } }
+/* Запись к врачу — мастер по шагам */
+.booking-wizard { display: grid; gap: 14px; max-width: 920px; }
+.booking-wizard > .panel { animation: booking-step-in .25s ease-out; }
+@keyframes booking-step-in { from { opacity: 0; transform: translateY(6px); } }
+.booking-progress { scroll-margin-top: 100px; }
+.booking-progress__label { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+.booking-progress__label strong { color: var(--ink-strong); }
+.booking-progress__steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.booking-progress__steps li { display: grid; gap: 6px; color: var(--muted-light); font-size: 12px; font-weight: 650; }
+.booking-progress__steps li::before { height: 5px; border-radius: 99px; background: var(--line); content: ""; }
+.booking-progress__steps li.is-done { color: var(--muted); }
+.booking-progress__steps li.is-done::before { background: color-mix(in srgb, var(--green) 55%, var(--line)); }
+.booking-progress__steps li.is-current { color: var(--green); }
+.booking-progress__steps li.is-current::before { background: var(--green); }
+.booking-choice { padding: 16px 18px; border: 1px solid color-mix(in srgb, var(--green) 30%, var(--line)); border-radius: 12px; background: var(--green-soft); }
+.booking-choice .eyebrow { margin: 0 0 8px; }
+.booking-choice dl { display: grid; gap: 6px; margin: 0; }
+.booking-choice dl div { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; align-items: baseline; gap: 10px; font-size: 14px; }
+.booking-choice dt { color: var(--muted); }
+.booking-choice dd { margin: 0; color: var(--ink-strong); font-weight: 650; overflow-wrap: anywhere; }
+.booking-choice button { padding: 0; border: 0; color: var(--green); background: none; font: inherit; font-size: 13px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.booking-nav { display: flex; justify-content: space-between; gap: 10px; }
+.booking-nav .button { min-width: 150px; justify-content: center; }
+.booking-nav__hint { margin: -4px 0 0; color: var(--muted); font-size: 13px; text-align: right; }
+@media (max-width: 540px) {
+  .booking-progress__steps li span { display: none; }
+  .booking-choice dl { gap: 9px; }
+  .booking-choice dl div { grid-template-columns: minmax(0, 1fr) auto; gap: 1px 10px; }
+  .booking-choice dt { grid-row: 1; font-size: 12px; }
+  .booking-choice button { grid-column: 2; grid-row: 1; font-size: 12px; }
+  .booking-choice dd { grid-column: 1 / -1; grid-row: 2; }
+  .booking-nav { position: sticky; z-index: 5; bottom: 0; margin-inline: -12px; padding: 10px 12px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--page) 94%, transparent); backdrop-filter: blur(10px); }
+  .booking-nav .button { flex: 1; min-width: 0; padding-inline: 10px; white-space: nowrap; }
+  .booking-nav > span:empty { display: none; }
+  .booking-nav .button:last-child svg { display: none; }
+  .booking-nav__hint { text-align: center; }
+}
+@media (prefers-reduced-motion: reduce) { .booking-wizard > .panel { animation: none; } }
+
 .lab .conclusion__meta { margin-bottom: 8px; }
