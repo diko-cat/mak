@@ -20,6 +20,10 @@ export interface Doctor {
   profession?: 'physician' | 'clinical-specialist'
   description: string
   experienceYears: number
+  /** Образование: вуз, ординатура, повышение квалификации. */
+  education?: string
+  /** Фото врача; нет — показываются инициалы. */
+  photoUrl?: string
   rating: number
   initials: string
   accent: string

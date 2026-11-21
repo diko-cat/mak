@@ -331,3 +331,62 @@
   .admin-stat strong { font-size: 20px; overflow-wrap: anywhere; }
   .admin-row { flex-wrap: wrap; }
 }
+
+/* Запись к врачу — мастер по шагам */
+.booking-wizard { display: grid; gap: 14px; max-width: 920px; }
+.booking-wizard--forward > .panel { animation: booking-in-forward .38s cubic-bezier(.22, 1, .36, 1); }
+.booking-wizard--back > .panel { animation: booking-in-back .38s cubic-bezier(.22, 1, .36, 1); }
+@keyframes booking-in-forward { from { opacity: 0; transform: translateX(28px); } }
+@keyframes booking-in-back { from { opacity: 0; transform: translateX(-28px); } }
+.booking-wizard .choice-grid > *, .booking-wizard .slot-grid > * { animation: booking-pop .35s cubic-bezier(.22, 1, .36, 1) backwards; }
+.booking-wizard .choice-grid > :nth-child(2), .booking-wizard .slot-grid > :nth-child(2) { animation-delay: .03s; }
+.booking-wizard .choice-grid > :nth-child(3), .booking-wizard .slot-grid > :nth-child(3) { animation-delay: .06s; }
+.booking-wizard .choice-grid > :nth-child(4), .booking-wizard .slot-grid > :nth-child(4) { animation-delay: .09s; }
+.booking-wizard .choice-grid > :nth-child(5), .booking-wizard .slot-grid > :nth-child(5) { animation-delay: .12s; }
+.booking-wizard .choice-grid > :nth-child(n+6), .booking-wizard .slot-grid > :nth-child(n+6) { animation-delay: .15s; }
+@keyframes booking-pop { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+.booking-wizard .choice, .booking-wizard .slot, .booking-wizard .booking-calendar__day { transition: border-color .2s, background-color .2s, box-shadow .2s, transform .15s ease; }
+.booking-wizard .choice:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.booking-wizard .choice:active, .booking-wizard .slot:active:not(:disabled), .booking-wizard .booking-calendar__day:active:not(:disabled) { transform: scale(.97); }
+.booking-wizard .choice--active, .booking-wizard .slot--active, .booking-wizard .booking-calendar__day--selected { animation: booking-selected .35s ease-out; }
+@keyframes booking-selected { 40% { transform: scale(1.03); } }
+.booking-progress { scroll-margin-top: 100px; }
+.booking-progress__label { margin: 0 0 8px; color: var(--muted); font-size: 13px; }
+.booking-progress__label strong { display: inline-block; color: var(--ink-strong); animation: booking-label .3s ease-out; }
+@keyframes booking-label { from { opacity: 0; transform: translateY(5px); } }
+.booking-progress__steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.booking-progress__steps li { display: grid; gap: 6px; color: var(--muted-light); font-size: 12px; font-weight: 650; transition: color .3s; }
+.booking-progress__steps li::before { height: 5px; border-radius: 99px; background: linear-gradient(var(--green), var(--green)) left / 0% 100% no-repeat, var(--line); content: ""; transition: background-size .45s cubic-bezier(.22, 1, .36, 1); }
+.booking-progress__steps li.is-done, .booking-progress__steps li.is-current { color: var(--green); }
+.booking-progress__steps li.is-done::before, .booking-progress__steps li.is-current::before { background-size: 100% 100%; }
+.booking-choice { padding: 16px 18px; border: 1px solid color-mix(in srgb, var(--green) 30%, var(--line)); border-radius: 12px; background: var(--green-soft); animation: booking-label .3s ease-out; }
+.booking-choice .eyebrow { margin: 0 0 8px; }
+.booking-choice dl { display: grid; gap: 6px; margin: 0; }
+.booking-choice dl div { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: baseline; gap: 10px; font-size: 14px; animation: booking-row .4s cubic-bezier(.22, 1, .36, 1); }
+@keyframes booking-row { from { opacity: 0; transform: translateX(-10px); } }
+.booking-choice dt { color: var(--muted); }
+.booking-choice dd { margin: 0; color: var(--ink-strong); font-weight: 650; overflow-wrap: anywhere; }
+.booking-nav { display: flex; justify-content: space-between; gap: 10px; }
+.booking-nav .button { min-width: 150px; justify-content: center; transition: background-color .25s, opacity .25s, transform .15s, box-shadow .25s; }
+.booking-nav .button svg { transition: transform .2s ease; }
+.booking-nav .button:hover:not(:disabled) svg:last-child { transform: translateX(3px); }
+.booking-nav .button:active:not(:disabled) { transform: scale(.97); }
+.booking-nav__ready { animation: booking-ready .6s ease-out; }
+@keyframes booking-ready { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--green) 45%, transparent); } 100% { box-shadow: 0 0 0 12px transparent; } }
+.booking-nav__hint { margin: -4px 0 0; color: var(--muted); font-size: 13px; text-align: right; }
+@media (max-width: 540px) {
+  .booking-progress__steps li span { display: none; }
+  .booking-choice dl { gap: 9px; }
+  .booking-choice dl div { grid-template-columns: 1fr; gap: 1px; }
+  .booking-choice dt { font-size: 12px; }
+  .booking-nav { position: sticky; z-index: 5; bottom: 0; margin-inline: -12px; padding: 10px 12px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--page) 94%, transparent); backdrop-filter: blur(10px); }
+  .booking-nav .button { flex: 1; min-width: 0; padding-inline: 10px; white-space: nowrap; }
+  .booking-nav > span:empty { display: none; }
+  .booking-nav .button:last-child svg { display: none; }
+  .booking-nav__hint { text-align: center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .booking-wizard *, .booking-wizard *::before { animation: none !important; transition: none !important; }
+}
+
+.lab .conclusion__meta { margin-bottom: 8px; }

@@ -32,7 +32,7 @@ export function PatientOverview({ patient }: { patient: ReturnType<typeof usePat
 
       <Panel title="Анализы с отклонениями">
         {deviations.length > 0
-          ? <div className="stack">{deviations.map((test) => <LabTestCard key={test.id} test={test} onlyDeviations />)}</div>
+          ? <div className="stack">{deviations.map((test) => <LabTestCard key={test.id} test={test} doctor={doctorOf(test.doctorId)} onlyDeviations />)}</div>
           : <EmptyState>Все готовые показатели в пределах нормы.</EmptyState>}
       </Panel>
     </div>

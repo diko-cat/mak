@@ -64,3 +64,42 @@ export function describeHours(hours: WorkingHours | undefined): string {
   flush()
   return parts.join(', ') || 'Нет рабочих дней'
 }
+
+/**
+ * Отсутствие врача, которое идёт в `fromKey`: последний день подряд идущих периодов
+ * отсутствия и причина первого из них; `null`, если в этот день врач не отсутствует.
+ */
+export function absenceUntil(doctor: Doctor, fromKey: string): { until: string; reason: DoctorAbsence['reason'] } | null {
+  const absences: DoctorAbsence[] = doctor.absences ?? (doctor.daysOff ?? []).map((date) => ({ from: date, to: date, reason: 'Отпуск' as const }))
+  const covering = (key: string) => absences.find(({ from, to }) => key >= from && key <= to)
+  const first = covering(fromKey)
+  if (!first) return null
+  let until = first.to
+  for (;;) {
+    const next = new Date(`${until}T00:00:00`)
+    next.setDate(next.getDate() + 1)
+    const key = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`
+    const continued = covering(key)
+    if (!continued) return { until, reason: first.reason }
+    until = continued.to > key ? continued.to : key
+  }
+}
+
+/** От самого раннего начала до самого позднего конца; `null`, если интервалов нет. */
+function span(intervals: (WorkingInterval | null | undefined)[]): WorkingInterval | null {
+  const present = intervals.filter((interval): interval is WorkingInterval => Boolean(interval))
+  if (!present.length) return null
+  return {
+    start: present.map((interval) => interval.start).sort()[0],
+    end: present.map((interval) => interval.end).sort().at(-1)!,
+  }
+}
+
+/** Часы работы клиники по дням: объединение графиков активных врачей. */
+export function clinicWorkingHours(doctors: Doctor[]): WorkingHours {
+  const hours = doctors.filter((doctor) => doctor.active !== false).map((doctor) => doctor.workingHours ?? defaultWorkingHours())
+  return Object.fromEntries(WEEK_ORDER.map((day) => [day, span(hours.map((entry) => entry[day]))])) as WorkingHours
+}
+
+/** Самое раннее начало и самый поздний конец приёма за неделю. */
+export const workingRange = (hours: WorkingHours) => span(WEEK_ORDER.map((day) => hours[day]))
