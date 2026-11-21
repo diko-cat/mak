@@ -831,3 +831,4 @@ button.footer-top-link { padding: 0; border: 0; background: transparent; cursor:
 .booking-toast div { display: flex; gap: 8px; }
 .booking-toast a, .booking-toast button { padding: 8px 12px; border: 1px solid var(--line); border-radius: 99px; color: var(--green); background: transparent; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .booking-toast a { color: var(--surface); background: var(--green); border-color: var(--green); }
+.demo-role-switcher select { width: auto; }

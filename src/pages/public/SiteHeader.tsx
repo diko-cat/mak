@@ -32,7 +32,9 @@ export function SiteHeader() {
   // Мобильное меню закрывается после любого перехода.
   useEffect(() => { menuRef.current?.removeAttribute('open') }, [pathname])
 
+  /** «Войти как…»: текущая роль завершается, вход открывается для выбранной. */
   function switchRole(role: Role) {
+    if (user) clearSession()
     navigate(`/login?role=${role}`)
   }
 
@@ -61,14 +63,15 @@ export function SiteHeader() {
         </details>
 
         <div className="site-header__actions">
-          <label className="demo-role-switcher" title="Выбрать демо-роль">
+          <label className="demo-role-switcher" title={user ? `Сейчас вы вошли как «${roleNames[user.role]}». Выбор другой роли завершит текущий вход.` : 'Войти в демо-кабинет от имени роли'}>
             <UserRound size={15} aria-hidden="true" />
             <select
-              aria-label="Демо-роль"
-              value={user?.role ?? 'patient'}
+              aria-label="Войти как…"
+              value=""
               onChange={(event) => switchRole(event.target.value as Role)}
             >
-              {Object.entries(roleNames).map(([role, name]) => <option key={role} value={role}>{name}</option>)}
+              <option value="" disabled hidden>Войти как…</option>
+              {Object.entries(roleNames).map(([role, name]) => <option key={role} value={role}>{name}{user?.role === role ? ' (сейчас)' : ''}</option>)}
             </select>
           </label>
           <button className="theme-toggle" type="button" onClick={toggleTheme} aria-label={theme === 'light' ? 'Включить тёмную тему' : 'Включить светлую тему'}>
