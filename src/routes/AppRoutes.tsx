@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Route, Routes, useLocation, useNavigationType } from 'react-router-dom'
 import { AdminPage } from '../pages/admin/AdminPage'
+import { DoctorPage } from '../pages/public/DoctorPage'
 import { HomePage } from '../pages/public/HomePage'
 import { LoginPage } from '../pages/public/LoginPage'
 import { NotFoundPage } from '../pages/public/NotFoundPage'
@@ -29,6 +30,7 @@ export function AppRoutes() {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/services" element={<ServicesPage />} />
         <Route path="/doctors" element={<DoctorsPage />} />
+        <Route path="/doctors/:id" element={<DoctorPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
