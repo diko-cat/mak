@@ -845,3 +845,16 @@ button.footer-top-link { padding: 0; border: 0; background: transparent; cursor:
 .role-menu__copy small { color: var(--muted); font-size: 12px; }
 .role-menu__check { margin-left: auto; color: var(--green); }
 @media (prefers-reduced-motion: reduce) { .role-menu__list { animation: none; } }
+.role-menu__item--logout { margin-top: 4px; border-top: 1px solid var(--line); border-radius: 0 0 10px 10px; }
+.role-menu__label { overflow: hidden; text-overflow: ellipsis; }
+/* «Войти как…» — единственный вход в шапке, поэтому виден и на телефоне. */
+@media (max-width: 540px) {
+  .demo-role-switcher { display: flex; max-width: 150px; height: 34px; padding-inline: 10px; font-size: 13px; }
+  .demo-role-switcher > svg:first-child { display: none; }
+  .role-menu__list { position: fixed; top: 64px; right: 12px; left: 12px; width: auto; }
+}
+.role-menu__label--short { display: none; }
+@media (max-width: 540px) {
+  .role-menu__label:has(+ .role-menu__label--short) { display: none; }
+  .role-menu__label--short { display: inline; }
+}
