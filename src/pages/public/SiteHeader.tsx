@@ -1,5 +1,6 @@
 import { ArrowUpRight, Menu, Moon, Sun, UserRound } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useRef } from 'react'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useSession, clearSession } from '../../store/session'
 import { toggleTheme, useTheme } from '../../store/theme'
 import type { Role } from '../../types'
@@ -10,6 +11,13 @@ const roleNames: Record<Role, string> = {
   admin: 'Администратор',
 }
 
+export const siteLinks = [
+  { to: '/about', label: 'О клинике' },
+  { to: '/services', label: 'Услуги' },
+  { to: '/doctors', label: 'Врачи' },
+  { to: '/contacts', label: 'Контакты' },
+]
+
 export function roleHomePath(role: Role): string {
   return `/${role}`
 }
@@ -18,6 +26,11 @@ export function SiteHeader() {
   const user = useSession()
   const theme = useTheme()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const menuRef = useRef<HTMLDetailsElement>(null)
+
+  // Мобильное меню закрывается после любого перехода.
+  useEffect(() => { menuRef.current?.removeAttribute('open') }, [pathname])
 
   function switchRole(role: Role) {
     navigate(`/login?role=${role}`)
@@ -37,19 +50,13 @@ export function SiteHeader() {
         </Link>
 
         <nav className="site-nav" aria-label="Основная навигация">
-          <a href="/#about">О клинике</a>
-          <a href="/#services">Услуги</a>
-          <a href="/#doctors">Врачи</a>
-          <a href="/#contacts">Контакты</a>
+          {siteLinks.map(({ to, label }) => <NavLink key={to} to={to}>{label}</NavLink>)}
         </nav>
 
-        <details className="mobile-menu">
+        <details className="mobile-menu" ref={menuRef}>
           <summary aria-label="Открыть меню"><Menu size={19} /></summary>
           <nav aria-label="Мобильная навигация">
-            <a href="/#about" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>О клинике</a>
-            <a href="/#services" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>Услуги</a>
-            <a href="/#doctors" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>Врачи</a>
-            <a href="/#contacts" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>Контакты</a>
+            {siteLinks.map(({ to, label }) => <NavLink key={to} to={to} onClick={() => menuRef.current?.removeAttribute('open')}>{label}</NavLink>)}
           </nav>
         </details>
 
