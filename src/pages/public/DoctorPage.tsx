@@ -46,6 +46,8 @@ export function DoctorPage() {
   const doctorServices: Service[] = doctor ? services.filter((service) => service.specialty === doctor.specialty) : []
   const duration = doctorServices.length ? Math.min(...doctorServices.map((service) => service.durationMinutes)) : 30
   const { slots, error } = useNearestSlots(doctor, duration)
+  // Если услуга у врача одна, её тоже можно выбрать заранее.
+  const onlyServiceId = doctorServices.length === 1 ? doctorServices[0].id : undefined
 
   if (!loaded) return <main className="public-page section"><div className="container"><p className="loading-note">Загружаем карточку врача…</p></div></main>
   if (!doctor) return <NotFoundPage title="Такого врача нет или он сейчас не принимает." />
@@ -72,7 +74,7 @@ export function DoctorPage() {
                 {doctor.room && <li><DoorOpen size={16} /> Кабинет {doctor.room}</li>}
               </ul>
               {vacationUntil && <p className="doctor-profile__away" role="status"><CalendarOff size={16} /> Не принимает до {dateFormat.format(new Date(`${vacationUntil}T00:00:00`))} включительно</p>}
-              <BookLink className={buttonStyles('primary', 'doctor-profile__book')}>Записаться <ArrowRight size={16} /></BookLink>
+              <BookLink doctorId={doctor.id} serviceId={onlyServiceId} className={buttonStyles('primary', 'doctor-profile__book')}>Записаться <ArrowRight size={16} /></BookLink>
             </div>
           </aside>
 
@@ -98,7 +100,7 @@ export function DoctorPage() {
                 <ul className="doctor-slots">
                   {slots.map((slot) => (
                     <li key={slot}>
-                      <BookLink className="doctor-slot">
+                      <BookLink doctorId={doctor.id} serviceId={onlyServiceId} className="doctor-slot">
                         <small>{weekdayFormat.format(new Date(slot))}, {shortDateFormat.format(new Date(slot))}</small>
                         <strong>{formatTime(slot)}</strong>
                       </BookLink>
@@ -115,7 +117,7 @@ export function DoctorPage() {
                     <li key={service.id}>
                       <span><strong>{service.name}</strong><small>{service.durationMinutes} мин · {service.description}</small></span>
                       <b>{formatPrice(service.price)}</b>
-                      <BookLink className="service-row__arrow" aria-label={`Записаться: ${service.name}`}><ArrowUpRight size={16} /></BookLink>
+                      <BookLink doctorId={doctor.id} serviceId={service.id} className="service-row__arrow" aria-label={`Записаться: ${service.name}`}><ArrowUpRight size={16} /></BookLink>
                     </li>
                   ))}
                 </ul>
