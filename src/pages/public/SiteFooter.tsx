@@ -1,5 +1,5 @@
 import { ArrowUpRight } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 
 export function SiteFooter() {
   return (
@@ -13,13 +13,13 @@ export function SiteFooter() {
           <p className="site-footer__note">Демо-сайт клиники «Сана».<br />Здоровье начинается с внимания.</p>
         </div>
         <div className="site-footer__links">
-          <a href="/#about">О клинике</a>
-          <a href="/#services">Услуги и цены</a>
-          <a href="/#doctors">Наши врачи</a>
-          <a href="/#contacts">Связаться с нами</a>
-          <Link to="/privacy">Политика конфиденциальности</Link>
+          <NavLink to="/about">О клинике</NavLink>
+          <NavLink to="/services">Услуги и цены</NavLink>
+          <NavLink to="/doctors">Наши врачи</NavLink>
+          <NavLink to="/contacts">Связаться с нами</NavLink>
+          <NavLink to="/privacy">Политика конфиденциальности</NavLink>
         </div>
-        <a className="footer-top-link" href="#top">Наверх <ArrowUpRight size={15} /></a>
+        <button className="footer-top-link" type="button" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Наверх <ArrowUpRight size={15} /></button>
       </div>
       <div className="container site-footer__bottom">
         <span>© {new Date().getFullYear()} Клиника «Сана»</span>

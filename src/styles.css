@@ -188,8 +188,8 @@ button { color: inherit; }
 .about-number span { padding-top: 7px; color: var(--muted); font-family: Georgia, serif; font-size: 15px; font-style: italic; letter-spacing: 0; line-height: 1.2; }
 .about-aside__line { width: 41px; height: 1px; margin-top: 24px; background: var(--green); }
 .about-aside > p:last-child { max-width: 143px; margin-top: 16px; color: var(--muted); font-size: 14px; line-height: 1.7; }
-.section-heading h2 { margin: 8px 0 11px; color: var(--ink-strong); font-size: clamp(31px, 3.4vw, 43px); font-weight: 550; letter-spacing: -.06em; line-height: 1.07; }
-.section-heading h2 em, .access-intro h2 em, .contact-copy h2 em { color: var(--green); font-family: Georgia, "Times New Roman", serif; font-weight: 400; }
+.section-heading :is(h1, h2) { margin: 8px 0 11px; color: var(--ink-strong); font-size: clamp(31px, 3.4vw, 43px); font-weight: 550; letter-spacing: -.06em; line-height: 1.07; }
+.section-heading :is(h1, h2) em, .access-intro h2 em, .contact-copy :is(h1, h2) em { color: var(--green); font-family: Georgia, "Times New Roman", serif; font-weight: 400; }
 .section-heading__description { max-width: 580px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.8; }
 .principles-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; margin-top: 37px; }
 .principle-card { min-height: 168px; padding: 17px 16px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); }
@@ -274,8 +274,8 @@ button { color: inherit; }
 .section--contact { padding-block: 0 85px; background: var(--surface); }
 .contact-grid { display: grid; grid-template-columns: .92fr 1.08fr; gap: 89px; align-items: start; }
 .contact-copy { padding: 24px 0 0 18px; }
-.contact-copy h2 { margin: 14px 0; color: var(--ink-strong); font-size: 43px; font-weight: 530; letter-spacing: -.065em; line-height: 1.04; }
-.contact-copy h2 em { color: var(--green); }
+.contact-copy :is(h1, h2) { margin: 14px 0; color: var(--ink-strong); font-size: 43px; font-weight: 530; letter-spacing: -.065em; line-height: 1.04; }
+.contact-copy :is(h1, h2) em { color: var(--green); }
 .contact-copy > p:not(.eyebrow) { max-width: 385px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.8; }
 .contact-details { margin-top: 30px; border-top: 1px solid var(--line); }
 .contact-details > a, .contact-details > div { display: grid; grid-template-columns: 37px 1fr 16px; align-items: center; gap: 11px; min-height: 65px; border-bottom: 1px solid var(--line); }
@@ -672,7 +672,7 @@ button { color: inherit; }
   .hero-metrics > div span { font-size: 12px; }
   .hero-metrics > a { grid-column: auto; grid-row: auto; justify-self: start; font-size: 12px; }
   .section { padding: 57px 0; }
-  .section-heading h2 { font-size: 33px; }
+  .section-heading :is(h1, h2) { font-size: 33px; }
   .section-heading__description { font-size: 14px; }
   .principles-grid { grid-template-columns: 1fr; gap: 8px; }
   .principle-card { min-height: initial; display: grid; grid-template-columns: 37px 1fr; gap: 0 10px; padding: 12px; }
@@ -699,7 +699,7 @@ button { color: inherit; }
   .access-role__icon { width: 32px; height: 32px; }
   .access-role__number { display: none; }
   .access-role__copy small { max-width: 230px; }
-  .contact-copy h2 { font-size: 37px; }
+  .contact-copy :is(h1, h2) { font-size: 37px; }
   .callback-card { padding: 21px 17px 17px; }
   .closing-strip .container { gap: 12px; min-height: 45px; }
   .closing-strip span, .closing-strip a { font-size: 11px; }
@@ -753,4 +753,26 @@ button { color: inherit; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* Отдельные публичные страницы и навигация */
+.public-page { flex: 1; }
+.section--contact.section--page { padding-top: 70px; }
+.site-nav a.active { color: var(--green); }
+.site-nav a.active::after { transform: scaleX(1); }
+.mobile-menu nav a.active, .site-footer__links a.active { color: var(--green); }
+.site-footer__links a.active { color: #f2f7ed; text-decoration: underline; text-underline-offset: 4px; }
+button.footer-top-link { padding: 0; border: 0; background: transparent; cursor: pointer; font-family: inherit; }
+.filter-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: -14px 0 26px; }
+.filter-chip { min-height: 38px; padding: 0 15px; border: 1px solid var(--line); border-radius: 99px; color: var(--ink); background: var(--surface); font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; transition: background .2s, color .2s, border-color .2s; }
+.filter-chip:hover { border-color: var(--green); }
+.filter-chip[aria-pressed="true"] { border-color: var(--green); color: var(--surface); background: var(--green); }
+@media (max-width: 540px) {
+  .filter-chips { flex-wrap: nowrap; overflow-x: auto; margin: -6px 0 20px; padding: 0 0 4px; scrollbar-width: none; }
+  .filter-chip { flex: none; min-height: 36px; font-size: 13px; }
+}
+@media (max-width: 780px) {
+  /* Ссылка в карточке шла поверх текста на узком экране. */
+  .services-intro-card { min-height: 0; }
+  .services-intro-card > a { position: static; margin-top: 18px; }
 }
