@@ -6,6 +6,7 @@ import {
   BadgeCheck,
   Check,
   Clock3,
+  Mail,
   HeartHandshake,
   MapPin,
   MessageCircleHeart,
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { createCallRequest } from '../../api'
+import { clinicWorkingHours, describeHours, workingRange } from '../../api/schedule'
 import { Button, SectionHeading } from '../../components/ui'
 import { useReveal } from '../../hooks/useReveal'
 import type { Clinic, Doctor, Service } from '../../types'
@@ -149,12 +151,19 @@ export function DoctorsSection({ doctors, page, limit }: SectionProps & { doctor
   )
 }
 
-export function ContactsSection({ clinic, page }: SectionProps & { clinic: Clinic | null }) {
+export function ContactsSection({ clinic, doctors, page }: SectionProps & { clinic: Clinic | null; doctors: Doctor[] }) {
   const [form, setForm] = useState({ name: '', phone: '', preferredTime: '' })
   const [requestState, setRequestState] = useState<'idle' | 'sending' | 'success' | 'error'>('idle')
   const [requestError, setRequestError] = useState('')
   const phoneHref = clinic?.phone.replace(/[^\d+]/g, '') ?? ''
   const Heading = page ? 'h1' : 'h2'
+  const hours = clinicWorkingHours(doctors)
+  const range = workingRange(hours)
+  // Регистратура звонит в часы работы клиники, поэтому варианты берём из них.
+  const callTimes = range ? [
+    range.start < '12:00' && `Утром, ${range.start}–12:00`,
+    range.end > '12:00' && `Днём, ${range.start > '12:00' ? range.start : '12:00'}–${range.end}`,
+  ].filter((option): option is string => Boolean(option)) : []
   useReveal('.contact-copy, .callback-card')
 
   async function submitCallback(event: React.FormEvent<HTMLFormElement>) {
@@ -181,7 +190,8 @@ export function ContactsSection({ clinic, page }: SectionProps & { clinic: Clini
           <div className="contact-details">
             {clinic?.phone && phoneHref ? <a href={`tel:${phoneHref}`}><span><Phone size={17} /></span><div><small>ТЕЛЕФОН</small><strong>{clinic.phone}</strong></div><ArrowUpRight size={15} /></a> : <div><span><Phone size={17} /></span><div><small>ТЕЛЕФОН</small><strong>Официальный номер не указан в демо-версии</strong></div></div>}
             <div><span><MapPin size={17} /></span><div><small>АДРЕС</small><strong>{clinic?.address || 'Официальный адрес не указан в демо-версии'}</strong></div></div>
-            <div><span><Clock3 size={17} /></span><div><small>ГРАФИК ДЕМО-ЗАПИСИ</small><strong>{clinic?.workingHours || '09:00–17:00'}</strong></div></div>
+            {clinic?.email && <a href={`mailto:${clinic.email}`}><span><Mail size={17} /></span><div><small>ПОЧТА</small><strong>{clinic.email}</strong></div><ArrowUpRight size={15} /></a>}
+            <div><span><Clock3 size={17} /></span><div><small>ЧАСЫ РАБОТЫ</small><strong>{doctors.length ? describeHours(hours) : 'Загружаем…'}</strong></div></div>
           </div>
         </div>
         <form className="callback-card" onSubmit={submitCallback}>
@@ -190,7 +200,7 @@ export function ContactsSection({ clinic, page }: SectionProps & { clinic: Clini
           <p>В демо-версии заявка сохраняется только в этом браузере и не отправляется в клинику.</p>
           <label className="form-field"><span>Ваше имя</span><input required minLength={2} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Например, Алия" autoComplete="name" /></label>
           <label className="form-field"><span>Номер телефона</span><input required type="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="+7 (___) ___-__-__" autoComplete="tel" /></label>
-          <label className="form-field"><span>Когда удобнее позвонить <small>необязательно</small></span><select value={form.preferredTime} onChange={(event) => setForm({ ...form, preferredTime: event.target.value })}><option value="">Выберите время</option><option>Утром, 08:00–12:00</option><option>Днём, 12:00–17:00</option><option>Вечером, 17:00–20:00</option></select></label>
+          <label className="form-field"><span>Когда удобнее позвонить <small>необязательно</small></span><select value={form.preferredTime} onChange={(event) => setForm({ ...form, preferredTime: event.target.value })}><option value="">Выберите время</option>{callTimes.map((option) => <option key={option}>{option}</option>)}</select></label>
           <Button className="callback-submit" type="submit" disabled={requestState === 'sending'}>{requestState === 'sending' ? 'Отправляем…' : 'Жду звонка'} <ArrowRight size={17} /></Button>
           {requestState === 'success' && <p className="form-message form-message--success" role="status"><Check size={16} /> Демо-заявка сохранена в этом браузере.</p>}
           {requestState === 'error' && <p className="form-message form-message--error" role="alert">{requestError}</p>}
