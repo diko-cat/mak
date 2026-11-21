@@ -15,7 +15,7 @@ export function PatientResults({ patient }: { patient: ReturnType<typeof usePati
       </Panel>
       <Panel title={`Анализы · ${data.labTests.length}`}>
         {data.labTests.length > 0
-          ? <div className="stack">{data.labTests.map((test) => <LabTestCard key={test.id} test={test} />)}</div>
+          ? <div className="stack">{data.labTests.map((test) => <LabTestCard key={test.id} test={test} doctor={doctorOf(test.doctorId)} />)}</div>
           : <EmptyState>Анализов пока нет.</EmptyState>}
       </Panel>
     </div>
