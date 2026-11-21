@@ -13,6 +13,7 @@ import {
   type CreateConclusionInput,
   type CreateLabTestInput,
   type DemoAccount,
+  type DoctorAbsence,
   type Doctor,
   type DoctorInput,
   type LabTest,
@@ -28,8 +29,8 @@ import {
 } from '../types'
 import { hasPermission, roleLabels } from '../auth/permissions'
 import { getSession } from '../store/session'
-import { createId, readDatabase, writeDatabase, type MockDatabase } from './database'
-import { fitsWorkingHours, intervalFor, isValidTime, SLOT_STEP_MINUTES, toMinutes, WEEK_ORDER } from './schedule'
+import { createId, readDatabase, resetDemoDatabase, writeDatabase, type MockDatabase } from './database'
+import { fitsWorkingHours, intervalFor, isValidTime, SLOT_STEP_MINUTES, toMinutes, WEEKDAY_NAMES, WEEK_ORDER } from './schedule'
 
 /**
  * Проверка прав на стороне «сервера». Mock-слой берёт текущую сессию так же,
@@ -65,6 +66,12 @@ export async function login(credentials: LoginCredentials): Promise<User> {
   )
   if (!account) throw new ApiError('Проверьте email, пароль и выбранную роль.', 'INVALID_CREDENTIALS')
   return { ...account.user }
+}
+
+/** Resets the local demo database without changing the current session. */
+export async function resetDemoData(): Promise<void> {
+  requirePermission('doctors:manage')
+  resetDemoDatabase()
 }
 
 export async function getClinic(): Promise<Clinic> {
@@ -152,11 +159,12 @@ export async function getCalendarAvailability(
   doctorId: string,
   dates: string[],
   durationMinutes = 30,
+  ignoreAppointmentId?: string,
 ): Promise<Record<string, number>> {
   const doctor = readDatabase().doctors.find((entry) => entry.id === doctorId)
   if (!doctor) throw new ApiError('Выбранный врач не найден.', 'DOCTOR_NOT_FOUND')
   const availability = await Promise.all(dates.map(async (date) => {
-    const slots = await getDaySlots(doctorId, date, durationMinutes)
+    const slots = await getDaySlots(doctorId, date, durationMinutes, ignoreAppointmentId)
     return [date, slots.filter((slot) => slot.available).length] as const
   }))
   return Object.fromEntries(availability)
@@ -183,6 +191,7 @@ export async function createAppointment(input: CreateAppointmentInput): Promise<
   if (!doctor) throw new ApiError('Выбранный врач не найден.', 'DOCTOR_NOT_FOUND')
   if (!patient) throw new ApiError('Пациент не найден.', 'PATIENT_NOT_FOUND')
   if (!service) throw new ApiError('Выбранная услуга не найдена.', 'SERVICE_NOT_FOUND')
+  if (service.active === false) throw new ApiError('Эта услуга снята с записи.', 'SERVICE_ARCHIVED')
   if (doctor.active === false) throw new ApiError('Этот врач сейчас не принимает. Выберите другого специалиста.', 'DOCTOR_INACTIVE')
   if (service.specialty && service.specialty !== doctor.specialty) throw new ApiError('Эту услугу оказывает врач другой специальности.', 'DOCTOR_SPECIALTY_MISMATCH')
   if (Number.isNaN(startsAt.getTime())) throw new ApiError('Выберите корректную дату и время.', 'INVALID_APPOINTMENT_TIME')
@@ -217,7 +226,7 @@ function nextTicketNumber(database: MockDatabase): string {
  * подтвердить — администратор (только ожидающую), отменить — администратор любую
  * запланированную или пациент свою. Завершение приёма идёт через `completeAppointment`.
  */
-export async function updateAppointmentStatus(id: string, status: AppointmentStatus): Promise<Appointment> {
+export async function updateAppointmentStatus(id: string, status: AppointmentStatus, reason?: string): Promise<Appointment> {
   const database = readDatabase()
   const appointment = database.appointments.find((entry) => entry.id === id)
   if (!appointment) throw new ApiError('Запись не найдена.', 'APPOINTMENT_NOT_FOUND')
@@ -232,11 +241,21 @@ export async function updateAppointmentStatus(id: string, status: AppointmentSta
       requirePermission('appointments:cancel-any')
     }
     if (!isActiveStatus(appointment.status)) throw new ApiError('Эту запись уже нельзя отменить.', 'INVALID_STATUS_TRANSITION')
+    if (!reason?.trim() && user?.role === 'admin') throw new ApiError('Укажите причину отмены.', 'VALIDATION_ERROR')
+  } else if (status === 'no-show') {
+    requirePermission('appointments:cancel-any')
+    if (!isActiveStatus(appointment.status) || new Date(appointment.startsAt).getTime() > Date.now()) {
+      throw new ApiError('Отметить неявку можно только у прошедшего незакрытого приёма.', 'INVALID_STATUS_TRANSITION')
+    }
   } else {
     throw new ApiError('Такой переход статуса недоступен.', 'INVALID_STATUS_TRANSITION')
   }
 
   appointment.status = status
+  if (status === 'cancelled') {
+    appointment.cancelledBy = user?.role === 'admin' ? 'admin' : 'patient'
+    appointment.cancellationReason = reason?.trim() || undefined
+  }
   writeDatabase(database)
   return appointment
 }
@@ -251,6 +270,8 @@ export async function getConclusions(filters: string | ConclusionFilters = {}): 
 }
 
 export async function createConclusion(input: CreateConclusionInput): Promise<MedicalConclusion> {
+  const user = requirePermission('appointments:complete')
+  if (user.doctorId !== input.doctorId) throw new ApiError('Добавлять заключения можно только к своим приёмам.', 'FORBIDDEN')
   const database = readDatabase()
   if (!database.patients.some((patient) => patient.id === input.patientId)) throw new ApiError('Пациент не найден.', 'PATIENT_NOT_FOUND')
   if (!database.doctors.some((doctor) => doctor.id === input.doctorId)) throw new ApiError('Врач не найден.', 'DOCTOR_NOT_FOUND')
@@ -277,6 +298,8 @@ export async function completeAppointment(
   if (user.doctorId !== appointment.doctorId) throw new ApiError('Завершить можно только свой приём.', 'FORBIDDEN')
   if (appointment.status === 'cancelled') throw new ApiError('Нельзя завершить отменённый приём.', 'APPOINTMENT_CANCELLED')
   if (appointment.status === 'completed') throw new ApiError('Этот приём уже завершён.', 'APPOINTMENT_COMPLETED')
+  if (appointment.status !== 'confirmed') throw new ApiError('Завершить можно только подтверждённый приём.', 'APPOINTMENT_NOT_CONFIRMED')
+  if (new Date(appointment.startsAt).getTime() > Date.now()) throw new ApiError('Заключение можно внести после начала приёма.', 'APPOINTMENT_NOT_STARTED')
   const diagnosis = input.diagnosis.trim()
   if (diagnosis.length < 10) throw new ApiError('Заключение должно содержать минимум 10 символов.', 'VALIDATION_ERROR')
 
@@ -296,12 +319,25 @@ export async function completeAppointment(
 }
 
 export async function getLabTests(patientId?: string): Promise<LabTest[]> {
-  return readDatabase().labTests
+  const user = getSession()
+  if (user?.role === 'patient') patientId = user.patientId ?? '—'
+  const database = readDatabase()
+  const doctorPatientIds = user?.role === 'doctor'
+    ? new Set(database.appointments.filter((appointment) => appointment.doctorId === user.doctorId).map((appointment) => appointment.patientId))
+    : undefined
+  return database.labTests
     .filter((test) => !patientId || test.patientId === patientId)
+    .filter((test) => !doctorPatientIds || doctorPatientIds.has(test.patientId))
     .sort((left, right) => right.orderedAt.localeCompare(left.orderedAt))
 }
 
 export async function createLabTest(input: CreateLabTestInput): Promise<LabTest> {
+  const user = getSession()
+  if (user?.role === 'doctor') {
+    requirePermission('appointments:complete')
+    if (user.doctorId !== input.doctorId) throw new ApiError('Назначать анализы можно только своим пациентам.', 'FORBIDDEN')
+  } else if (user?.role === 'admin') requirePermission('appointments:view-all')
+  else requirePermission('appointments:complete')
   const database = readDatabase()
   if (!database.patients.some((patient) => patient.id === input.patientId)) throw new ApiError('Пациент не найден.', 'PATIENT_NOT_FOUND')
   if (!database.doctors.some((doctor) => doctor.id === input.doctorId)) throw new ApiError('Врач не найден.', 'DOCTOR_NOT_FOUND')
@@ -312,7 +348,37 @@ export async function createLabTest(input: CreateLabTestInput): Promise<LabTest>
     orderedAt: new Date().toISOString(),
     status: 'ordered',
   }
+  if (input.appointmentId) {
+    const appointment = database.appointments.find((entry) => entry.id === input.appointmentId)
+    if (!appointment || appointment.patientId !== input.patientId || appointment.doctorId !== input.doctorId) throw new ApiError('Запись для анализа не найдена.', 'APPOINTMENT_NOT_FOUND')
+  }
   database.labTests.push(test)
+  writeDatabase(database)
+  return test
+}
+
+export async function updateLabTest(id: string, patch: { status?: LabTest['status']; result?: string }): Promise<LabTest> {
+  const user = getSession()
+  if (user?.role === 'doctor') requirePermission('appointments:complete')
+  else if (user?.role === 'admin') requirePermission('appointments:view-all')
+  else requirePermission('appointments:complete')
+  const database = readDatabase()
+  const test = database.labTests.find((entry) => entry.id === id)
+  if (!test) throw new ApiError('Анализ не найден.', 'LAB_TEST_NOT_FOUND')
+  if (user?.role === 'doctor') {
+    const ownsPatient = database.appointments.some((appointment) => appointment.doctorId === user.doctorId && appointment.patientId === test.patientId)
+    if (!ownsPatient) throw new ApiError('Можно менять анализы только своих пациентов.', 'FORBIDDEN')
+  }
+  if (patch.status) {
+    const allowedNext: Record<LabTest['status'], LabTest['status'] | null> = { ordered: 'in-progress', 'in-progress': 'ready', ready: null }
+    if (allowedNext[test.status] !== patch.status) throw new ApiError('Статус анализа можно менять только по порядку.', 'INVALID_STATUS_TRANSITION')
+    test.status = patch.status
+  }
+  if (patch.result !== undefined) {
+    if (test.status !== 'ready') throw new ApiError('Результат можно внести, когда анализ готов.', 'INVALID_STATUS_TRANSITION')
+    test.result = patch.result.trim()
+    test.resultAt = new Date().toISOString()
+  }
   writeDatabase(database)
   return test
 }
@@ -374,6 +440,7 @@ export async function rescheduleAppointment(id: string, startsAtIso: string, doc
     throw new ApiError('Это время уже занято. Выберите другой слот.', 'SLOT_TAKEN')
   }
   appointment.doctorId = doctor.id
+  appointment.rescheduledFrom ??= appointment.startsAt
   appointment.startsAt = startsAt.toISOString()
   writeDatabase(database)
   return appointment
@@ -434,20 +501,31 @@ export async function deleteDoctor(id: string): Promise<void> {
 
 /* ───────────── Администратор: рабочие часы и расписание ───────────── */
 
-export async function updateDoctorSchedule(id: string, schedule: { workingHours: WorkingHours; daysOff: string[] }): Promise<Doctor> {
+export async function updateDoctorSchedule(id: string, schedule: { workingHours: WorkingHours; absences: DoctorAbsence[]; scheduleOverrides?: Record<string, { start: string; end: string } | null> }): Promise<Doctor> {
   requirePermission('schedule:manage')
   for (const day of WEEK_ORDER) {
     const interval = schedule.workingHours[day]
     if (!interval) continue
     if (!isValidTime(interval.start) || !isValidTime(interval.end)) throw new ApiError('Время укажите в формате ЧЧ:ММ.', 'VALIDATION_ERROR')
-    if (toMinutes(interval.end) - toMinutes(interval.start) < SLOT_STEP_MINUTES) throw new ApiError('Рабочий день должен заканчиваться позже начала хотя бы на 30 минут.', 'VALIDATION_ERROR')
+    if (toMinutes(interval.end) - toMinutes(interval.start) < SLOT_STEP_MINUTES) throw new ApiError(`Конец раньше начала или интервал короче 30 минут: ${WEEKDAY_NAMES[day]}.`, 'VALIDATION_ERROR')
   }
-  if (schedule.daysOff.some((date) => !/^\d{4}-\d{2}-\d{2}$/.test(date))) throw new ApiError('Проверьте даты нерабочих дней.', 'VALIDATION_ERROR')
+  for (const absence of schedule.absences) {
+    if (!validDateKey(absence.from) || !validDateKey(absence.to)) throw new ApiError('Проверьте даты отсутствия.', 'VALIDATION_ERROR')
+    if (absence.to < absence.from) throw new ApiError('Дата «по» не может быть раньше даты «с».', 'INVALID_ABSENCE_RANGE')
+  }
+  for (const [date, interval] of Object.entries(schedule.scheduleOverrides ?? {})) {
+    if (!validDateKey(date)) throw new ApiError('Проверьте даты исключений расписания.', 'VALIDATION_ERROR')
+    if (interval && (!isValidTime(interval.start) || !isValidTime(interval.end) || toMinutes(interval.end) - toMinutes(interval.start) < SLOT_STEP_MINUTES)) {
+      throw new ApiError(`Проверьте часы работы на ${date}.`, 'INVALID_WORKING_HOURS')
+    }
+  }
   const database = readDatabase()
   const doctor = database.doctors.find((entry) => entry.id === id)
   if (!doctor) throw new ApiError('Врач не найден.', 'DOCTOR_NOT_FOUND')
   doctor.workingHours = schedule.workingHours
-  doctor.daysOff = [...new Set(schedule.daysOff)].sort()
+  doctor.absences = schedule.absences.map((absence) => ({ ...absence })).sort((a, b) => a.from.localeCompare(b.from))
+  doctor.scheduleOverrides = schedule.scheduleOverrides ?? {}
+  delete doctor.daysOff
   writeDatabase(database)
   return doctor
 }
@@ -460,8 +538,27 @@ export async function getScheduleConflicts(doctorId: string): Promise<Appointmen
   if (!doctor) return []
   return database.appointments
     .filter((entry) => entry.doctorId === doctorId && isActiveStatus(entry.status) && new Date(entry.startsAt).getTime() > Date.now())
-    .filter((entry) => !fitsWorkingHours(doctor, new Date(entry.startsAt), database.services.find((service) => service.id === entry.serviceId)?.durationMinutes ?? 30))
+    .filter((entry) => doctor.active === false || !fitsWorkingHours(doctor, new Date(entry.startsAt), database.services.find((service) => service.id === entry.serviceId)?.durationMinutes ?? 30))
     .sort((left, right) => left.startsAt.localeCompare(right.startsAt))
+}
+
+/** Return future visits that would become invalid under a proposed doctor schedule. */
+export async function getScheduleConflictsFor(doctorId: string, schedule: { workingHours: WorkingHours; absences: DoctorAbsence[]; scheduleOverrides?: Record<string, { start: string; end: string } | null>; active?: boolean }): Promise<Appointment[]> {
+  requirePermission('schedule:manage')
+  const database = readDatabase()
+  const doctor = database.doctors.find((entry) => entry.id === doctorId)
+  if (!doctor) throw new ApiError('Врач не найден.', 'DOCTOR_NOT_FOUND')
+  const proposed: Doctor = { ...doctor, ...schedule }
+  return database.appointments
+    .filter((entry) => entry.doctorId === doctorId && isActiveStatus(entry.status) && new Date(entry.startsAt).getTime() > Date.now())
+    .filter((entry) => proposed.active === false || !fitsWorkingHours(proposed, new Date(entry.startsAt), database.services.find((service) => service.id === entry.serviceId)?.durationMinutes ?? 30))
+    .sort((left, right) => left.startsAt.localeCompare(right.startsAt))
+}
+
+function validDateKey(date: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false
+  const parsed = new Date(`${date}T00:00:00`)
+  return !Number.isNaN(parsed.getTime()) && `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}` === date
 }
 
 /* ───────────── Администратор: услуги и цены ───────────── */
@@ -469,7 +566,8 @@ export async function getScheduleConflicts(doctorId: string): Promise<Appointmen
 function validateService(input: ServiceInput): void {
   if (input.name.trim().length < 3) throw new ApiError('Укажите название услуги.', 'VALIDATION_ERROR')
   if (!input.category.trim()) throw new ApiError('Укажите категорию.', 'VALIDATION_ERROR')
-  if (!Number.isFinite(input.price) || input.price < 0) throw new ApiError('Цена не может быть отрицательной.', 'VALIDATION_ERROR')
+  if (!Number.isFinite(input.price)) throw new ApiError('Укажите цену.', 'VALIDATION_ERROR')
+  if (input.price < 0) throw new ApiError('Цена не может быть отрицательной.', 'VALIDATION_ERROR')
   if (!Number.isInteger(input.durationMinutes) || input.durationMinutes < 5 || input.durationMinutes > 240) throw new ApiError('Длительность — от 5 до 240 минут.', 'VALIDATION_ERROR')
 }
 
@@ -506,9 +604,8 @@ export async function deleteService(id: string): Promise<void> {
   requirePermission('services:manage')
   const database = readDatabase()
   if (!database.services.some((entry) => entry.id === id)) throw new ApiError('Услуга не найдена.', 'SERVICE_NOT_FOUND')
-  if (database.appointments.some((entry) => entry.serviceId === id && isActiveStatus(entry.status))) {
-    throw new ApiError('На эту услугу есть запланированные приёмы. Сначала перенесите или отмените их.', 'SERVICE_IN_USE')
-  }
-  database.services = database.services.filter((entry) => entry.id !== id)
+  const service = database.services.find((entry) => entry.id === id)
+  if (database.appointments.some((entry) => entry.serviceId === id)) service!.active = false
+  else database.services = database.services.filter((entry) => entry.id !== id)
   writeDatabase(database)
 }

@@ -50,6 +50,7 @@ export const statusLabel: Record<AppointmentStatus, string> = {
   confirmed: 'Подтверждена',
   completed: 'Завершена',
   cancelled: 'Отменена',
+  'no-show': 'Не явился',
 }
 
 export type IndicatorState = 'low' | 'high' | 'normal'

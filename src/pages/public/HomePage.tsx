@@ -61,7 +61,7 @@ export function HomePage() {
       if (!active) return
       setClinic(clinicData)
       setDoctors(doctorData)
-      setServices(serviceData)
+      setServices(serviceData.filter((service) => service.active !== false))
     })
     return () => { active = false }
   }, [])

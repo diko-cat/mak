@@ -29,9 +29,16 @@ export interface Doctor {
   room?: string
   /** Рабочие часы по дням недели. Нет поля — работает ежедневно 09:00–17:00. */
   workingHours?: WorkingHours
-  /** Даты-исключения (YYYY-MM-DD), когда врач не принимает: отпуск, больничный. */
+  /** Legacy single days, converted to one-day absences when the database is read. */
   daysOff?: string[]
+  /** Inclusive date ranges when the doctor is unavailable. */
+  absences?: DoctorAbsence[]
+  /** Per-date calendar overrides; an absent key follows the weekly template. */
+  scheduleOverrides?: Record<string, WorkingInterval | null>
 }
+
+export type AbsenceReason = 'Отпуск' | 'Больничный' | 'Обучение' | 'Другое'
+export interface DoctorAbsence { from: string; to: string; reason: AbsenceReason }
 
 /** Интервал рабочего дня, время в формате HH:MM. */
 export interface WorkingInterval {
@@ -54,6 +61,8 @@ export interface Service {
   durationMinutes: number
   /** Специальность врача, который оказывает услугу (совпадает с `Doctor.specialty`). */
   specialty?: string
+  /** Archived services stay in appointment history but cannot be booked. */
+  active?: boolean
 }
 
 export interface Patient {
@@ -80,7 +89,7 @@ export interface DemoAccount {
   password: string
 }
 
-export type AppointmentStatus = 'requested' | 'confirmed' | 'completed' | 'cancelled'
+export type AppointmentStatus = 'requested' | 'confirmed' | 'completed' | 'cancelled' | 'no-show'
 
 export interface Appointment {
   id: string
@@ -93,6 +102,9 @@ export interface Appointment {
   note?: string
   /** Номер талона, выдаётся при записи. */
   ticketNumber?: string
+  cancelledBy?: 'patient' | 'admin'
+  cancellationReason?: string
+  rescheduledFrom?: string
 }
 
 export interface MedicalConclusion {
@@ -119,6 +131,7 @@ export interface LabTest {
   id: string
   patientId: string
   doctorId: string
+  appointmentId?: string
   name: string
   orderedAt: string
   resultAt?: string
@@ -162,6 +175,7 @@ export interface CreateLabTestInput {
   patientId: string
   doctorId: string
   name: string
+  appointmentId?: string
 }
 
 export interface CreateCallRequestInput {

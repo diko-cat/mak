@@ -67,6 +67,7 @@
 .status-pill--confirmed { color: var(--info); background: var(--info-soft); }
 .status-pill--completed { color: var(--green); background: var(--green-soft); }
 .status-pill--cancelled { color: var(--muted); background: var(--surface-alt); }
+.status-pill--no-show { color: var(--danger); background: var(--danger-soft); }
 
 /* Талон */
 .ticket { display: grid; grid-template-columns: 1fr 170px; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-alt); }
@@ -208,6 +209,21 @@
 .schedule-item:hover { border-color: color-mix(in srgb, var(--green) 50%, var(--line)); }
 .schedule-item--active { border-color: var(--green); background: color-mix(in srgb, var(--green-soft) 55%, var(--surface)); box-shadow: inset 0 0 0 1px var(--green); }
 .schedule-item--cancelled { opacity: .6; }
+.doctor-calendar-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 10px; }
+.doctor-calendar-tools__date input { min-height: 40px; padding: 0 8px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--surface); }
+.doctor-working-hours { margin: 0 0 8px; }
+.doctor-working-hours strong { color: var(--ink-strong); }
+.doctor-unclosed { display: flex; width: 100%; align-items: center; gap: 5px; margin: 0 0 12px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--surface-alt); text-align: left; cursor: pointer; }
+.doctor-unclosed strong { color: var(--green); }
+.doctor-unclosed span { margin-left: auto; color: var(--green); font-size: 12px; font-weight: 650; }
+.doctor-unclosed--active { border-color: var(--green); }
+.doctor-lab-choices { display: grid; gap: 8px; margin: 0 0 14px; padding: 12px; border: 1px solid var(--line); border-radius: 9px; }
+.doctor-lab-choices legend { padding: 0 5px; color: var(--ink-strong); font-size: 13px; font-weight: 700; }
+.doctor-lab-choices label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.doctor-lab-choices input { accent-color: var(--green); }
+.doctor-lab-row { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--page); }
+.doctor-lab-row .form-field { margin: 0; }
+.doctor-lab-row p { margin: 0; font-size: 13px; }
 .schedule-item__time { display: inline-flex; align-items: center; gap: 4px; color: var(--green); font-size: 14px; font-weight: 750; }
 .schedule-item__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .schedule-item__body strong { font-size: 13px; }
@@ -272,7 +288,7 @@
 .ticket { border-radius: 16px; box-shadow: var(--shadow-sm); }
 
 /* Кабинет администратора */
-.admin-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 12px; }
 .admin-stat { display: flex; flex-direction: column; gap: 6px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow-sm); }
 .admin-stat small { color: var(--muted); font-size: 12px; }
 .admin-stat strong { color: var(--ink-strong); font-size: 24px; font-weight: 700; }

@@ -1,4 +1,4 @@
-import type { Doctor, WorkingHours, WorkingInterval } from '../types'
+import type { Doctor, DoctorAbsence, WorkingHours, WorkingInterval } from '../types'
 
 export const SLOT_STEP_MINUTES = 30
 
@@ -25,7 +25,11 @@ export const isValidTime = (time: string) => /^([01]\d|2[0-3]):[0-5]\d$/.test(ti
 
 /** Рабочий интервал врача на дату (YYYY-MM-DD) или `null`, если день нерабочий. */
 export function intervalFor(doctor: Doctor, dateKey: string): WorkingInterval | null {
-  if (doctor.daysOff?.includes(dateKey)) return null
+  const absences: DoctorAbsence[] = doctor.absences ?? (doctor.daysOff ?? []).map((date) => ({ from: date, to: date, reason: 'Отпуск' as const }))
+  if (absences.some(({ from, to }) => dateKey >= from && dateKey <= to)) return null
+  if (doctor.scheduleOverrides && Object.prototype.hasOwnProperty.call(doctor.scheduleOverrides, dateKey)) {
+    return doctor.scheduleOverrides[dateKey] ?? null
+  }
   const weekday = new Date(`${dateKey}T00:00:00`).getDay()
   const hours = doctor.workingHours ?? defaultWorkingHours()
   return hours[weekday] ?? null
