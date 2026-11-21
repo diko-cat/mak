@@ -139,7 +139,7 @@ export function DoctorsSection({ doctors, page, limit }: SectionProps & { doctor
                 <div className="doctor-portrait__circle"><span>{doctor.initials}</span></div>
                 <span className="doctor-order">{orderNumber(index)}</span>
               </div>
-              <div className="doctor-card__body"><p className="eyebrow">{doctor.specialty}</p><h3>{doctor.name}</h3><p>{doctor.experienceYears} лет практики</p><BookLink>Записаться <ArrowUpRight size={15} /></BookLink></div>
+              <div className="doctor-card__body"><p className="eyebrow">{doctor.specialty}</p><h3><Link className="doctor-card__name" to={`/doctors/${doctor.id}`}>{doctor.name}</Link></h3><p>{countLabel(doctor.experienceYears, ['год', 'года', 'лет'])} практики</p><BookLink>Записаться <ArrowUpRight size={15} /></BookLink></div>
             </article>
           ))}
           {doctors.length === 0 && <p className="loading-note">Загружаем команду…</p>}
