@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowDown, ArrowUp, FileText } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, FileText, FlaskConical } from 'lucide-react'
 import type { Appointment, Doctor, LabTest, MedicalConclusion, Service } from '../../types'
 import { formatDate, formatTime, indicatorState, longDayFormat } from '../cabinet/format'
 
@@ -34,16 +34,24 @@ export function ConclusionCard({ conclusion, doctor }: { conclusion: MedicalConc
   )
 }
 
-const labStatus: Record<LabTest['status'], string> = { ordered: 'Назначен', 'in-progress': 'В работе', ready: 'Готов' }
+const labStatus: Record<LabTest['status'], string> = { ordered: 'Назначен', 'in-progress': 'В лаборатории', ready: 'Готов' }
+
+/** Что сейчас происходит с анализом, пока результата нет. */
+const labPending: Record<LabTest['status'], string> = {
+  ordered: 'Врач назначил этот анализ. Сдайте его в процедурном кабинете — результат появится здесь.',
+  'in-progress': 'Анализ сдан и сейчас в лаборатории. Результат появится здесь, как только будет готов.',
+  ready: 'Результат готов, подробности уточните у врача.',
+}
 
 export function hasDeviations(test: LabTest): boolean {
   return Boolean(test.indicators?.some((indicator) => indicatorState(indicator) !== 'normal'))
 }
 
-export function LabTestCard({ test, onlyDeviations = false }: { test: LabTest; onlyDeviations?: boolean }) {
+export function LabTestCard({ test, doctor, onlyDeviations = false }: { test: LabTest; doctor?: Doctor; onlyDeviations?: boolean }) {
   const indicators = (test.indicators ?? []).filter((indicator) => !onlyDeviations || indicatorState(indicator) !== 'normal')
   return (
     <article className="lab">
+      <div className="conclusion__meta"><FlaskConical size={15} aria-hidden="true" /><span>Анализ</span>{doctor && <span>· назначил {doctor.name}, {doctor.specialty.toLowerCase()}</span>}</div>
       <div className="lab__head">
         <h3>{test.name}</h3>
         <span className={`lab__status lab__status--${test.status}`}>{labStatus[test.status]}</span>
@@ -71,7 +79,7 @@ export function LabTestCard({ test, onlyDeviations = false }: { test: LabTest; o
             })}
           </tbody>
         </table>
-      ) : test.result ? <p className="lab__result">{test.result}</p> : <p className="lab__result lab__result--pending">Результат ещё не готов.</p>}
+      ) : test.result ? <p className="lab__result">{test.result}</p> : <p className="lab__result lab__result--pending">{labPending[test.status]}</p>}
       {!onlyDeviations && hasDeviations(test) && <p className="lab__warning"><AlertTriangle size={14} aria-hidden="true" />Есть значения вне нормы — обсудите их с врачом.</p>}
     </article>
   )

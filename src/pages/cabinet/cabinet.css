@@ -320,3 +320,4 @@
 .booking-step { scroll-margin-top: 100px; animation: booking-step-in .3s ease-out; }
 @keyframes booking-step-in { from { opacity: 0; transform: translateY(8px); } }
 @media (prefers-reduced-motion: reduce) { .booking-step { animation: none; } }
+.lab .conclusion__meta { margin-bottom: 8px; }
