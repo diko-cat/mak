@@ -50,6 +50,7 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
   const [created, setCreated] = useState<Appointment | null>(null)
   /** Мастер записи: на экране один шаг, переход — кнопками «Назад» и «Продолжить». */
   const [step, setStep] = useState(1)
+  const [direction, setDirection] = useState<'forward' | 'back'>('forward')
 
   const bookingDays = useMemo(() => Array.from({ length: BOOKING_DAYS }, (_, index) => addDays(index)), [])
   const bookingDateKeys = useMemo(() => bookingDays.map(toDateKey), [bookingDays])
@@ -128,6 +129,7 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
   const canContinue = stepDone[step - 1]
 
   function goTo(next: number) {
+    setDirection(next > step ? 'forward' : 'back')
     setStep(next)
     setError('')
     const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -176,9 +178,9 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
   }
 
   return (
-    <div className="booking-wizard">
+    <div className={`booking-wizard booking-wizard--${direction}`}>
       <div id="booking-top" className="booking-progress">
-        <p className="booking-progress__label">Шаг {step} из {STEPS.length} · <strong>{STEPS[step - 1]}</strong></p>
+        <p className="booking-progress__label">Шаг {step} из {STEPS.length} · <strong key={step}>{STEPS[step - 1]}</strong></p>
         <ol className="booking-progress__steps">
           {STEPS.map((label, index) => (
             <li key={label} className={index + 1 < step ? 'is-done' : index + 1 === step ? 'is-current' : ''} aria-current={index + 1 === step ? 'step' : undefined}>
@@ -196,7 +198,6 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
               <div key={choice.label}>
                 <dt>{choice.label}</dt>
                 <dd>{choice.value}</dd>
-                {choice.step < step && <button type="button" onClick={() => goTo(choice.step)}>Изменить</button>}
               </div>
             ))}
           </dl>
@@ -304,7 +305,7 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
       <div className="booking-nav">
         {step > 1 ? <Button variant="secondary" onClick={() => goTo(step - 1)}><ArrowLeft size={16} /> Назад</Button> : <span />}
         {step < STEPS.length
-          ? <Button disabled={!canContinue} onClick={() => goTo(step + 1)}>Продолжить <ArrowRight size={16} /></Button>
+          ? <Button key={`next-${step}-${canContinue}`} className={canContinue ? 'booking-nav__ready' : ''} disabled={!canContinue} onClick={() => goTo(step + 1)}>Продолжить <ArrowRight size={16} /></Button>
           : <Button disabled={!ready || submitting} onClick={confirm}>{submitting ? 'Записываем…' : 'Подтвердить запись'} <ArrowRight size={16} /></Button>}
       </div>
       {!canContinue && <p className="booking-nav__hint">{STEP_HINTS[step - 1]}</p>}
