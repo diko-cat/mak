@@ -315,3 +315,8 @@
   .admin-stat strong { font-size: 20px; overflow-wrap: anywhere; }
   .admin-row { flex-wrap: wrap; }
 }
+
+/* Шаги записи появляются по очереди */
+.booking-step { scroll-margin-top: 100px; animation: booking-step-in .3s ease-out; }
+@keyframes booking-step-in { from { opacity: 0; transform: translateY(8px); } }
+@media (prefers-reduced-motion: reduce) { .booking-step { animation: none; } }

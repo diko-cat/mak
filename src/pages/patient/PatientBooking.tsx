@@ -13,6 +13,14 @@ const BOOKING_DAYS = 60
 const monthFormat = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' })
 const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 
+/** После выбора показываем следующий шаг и прокручиваем к нему. */
+function revealStep(step: number) {
+  requestAnimationFrame(() => {
+    const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    document.getElementById(`booking-step-${step}`)?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' })
+  })
+}
+
 function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1)
 }
@@ -97,6 +105,7 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
     setAvailability({})
     setVisibleMonth(firstMonth)
     setError('')
+    if (id) revealStep(2)
   }
   function chooseDoctor(id: string) {
     setDoctorId(id)
@@ -106,6 +115,7 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
     setAvailability({})
     setVisibleMonth(firstMonth)
     setError('')
+    revealStep(3)
   }
   function chooseDate(key: string) {
     if ((availability[key] ?? 0) < 1) return
@@ -113,6 +123,7 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
     setSlot('')
     setSlots([])
     setError('')
+    revealStep(4)
   }
   function changeMonth(offset: number) {
     setVisibleMonth((month) => new Date(month.getFullYear(), month.getMonth() + offset, 1))
@@ -168,8 +179,9 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
           </div>
         </Panel>
 
-        <Panel title={<><span className="step-index">2</span>Специалист</>}>
-          {!service ? <EmptyState>Сначала выберите услугу.</EmptyState> : doctors.length === 0 ? <EmptyState>Сейчас нет специалистов, которые принимают по этой услуге.</EmptyState> : (
+        {/* Шаги открываются по очереди: следующий появляется после выбора в предыдущем. */}
+        {service && <div id="booking-step-2" className="booking-step"><Panel title={<><span className="step-index">2</span>Специалист</>}>
+          {doctors.length === 0 ? <EmptyState>Сейчас нет специалистов, которые принимают по этой услуге.</EmptyState> : (
             <div className="choice-grid">
               {doctors.map((entry) => (
                 <button key={entry.id} type="button" className={`choice choice--doctor ${doctorId === entry.id ? 'choice--active' : ''}`} aria-pressed={doctorId === entry.id} onClick={() => chooseDoctor(entry.id)}>
@@ -179,10 +191,10 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
               ))}
             </div>
           )}
-        </Panel>
+        </Panel></div>}
 
-        <Panel title={<><span className="step-index">3</span>Дата</>}>
-          {!doctor ? <EmptyState>Выберите специалиста, чтобы увидеть даты.</EmptyState> : (
+        {doctor && <div id="booking-step-3" className="booking-step"><Panel title={<><span className="step-index">3</span>Дата</>}>
+          {(
             <div className="booking-calendar" role="group" aria-label="Свободные даты на ближайшие два месяца">
               <div className="booking-calendar__header">
                 <strong>{monthFormat.format(visibleMonth)}</strong>
@@ -225,10 +237,10 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
               {!calendarLoading && !calendarError && Object.keys(availability).length > 0 && !Object.values(availability).some((count) => count > 0) && <EmptyState>На ближайшие два месяца свободных дат нет.</EmptyState>}
             </div>
           )}
-        </Panel>
+        </Panel></div>}
 
-        <Panel title={<><span className="step-index">4</span>Время</>}>
-          {!date ? <EmptyState>Выберите дату.</EmptyState> : loadingSlots ? <LoadingNote>Загружаем расписание…</LoadingNote> : slots.some((entry) => entry.available) ? (
+        {date && <div id="booking-step-4" className="booking-step"><Panel title={<><span className="step-index">4</span>Время</>}>
+          {loadingSlots ? <LoadingNote>Загружаем расписание…</LoadingNote> : slots.some((entry) => entry.available) ? (
             <>
               <div className="slot-grid">
                 {slots.map((entry) => (
@@ -239,7 +251,7 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
                     disabled={!entry.available}
                     aria-pressed={slot === entry.startsAt}
                     title={entry.reason === 'busy' ? 'Время занято' : entry.reason === 'past' ? 'Время уже прошло' : undefined}
-                    onClick={() => { setSlot(entry.startsAt); setError('') }}
+                    onClick={() => { setSlot(entry.startsAt); setError(''); revealStep(5) }}
                   >
                     {formatTime(entry.startsAt)}
                   </button>
@@ -248,14 +260,14 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
               <p className="slot-legend"><span className="slot-legend__free" />свободно <span className="slot-legend__busy" />занято или прошло</p>
             </>
           ) : <EmptyState>На эту дату свободного времени нет. Выберите другой день.</EmptyState>}
-        </Panel>
+        </Panel></div>}
 
-        <Panel title={<><span className="step-index">5</span>Причина обращения</>}>
+        {slot && <div id="booking-step-5" className="booking-step"><Panel title={<><span className="step-index">5</span>Причина обращения</>}>
           <label className="form-field cabinet-field">
             <span>Опишите, что вас беспокоит</span>
-            <textarea rows={3} value={reason} maxLength={500} disabled={!slot} placeholder={slot ? 'Например: болит голова по утрам уже неделю' : 'Сначала выберите время'} onChange={(event) => setReason(event.target.value)} />
+            <textarea rows={3} value={reason} maxLength={500} placeholder="Например: болит голова по утрам уже неделю" onChange={(event) => setReason(event.target.value)} />
           </label>
-        </Panel>
+        </Panel></div>}
       </div>
 
       <aside className="booking-summary-card" aria-label="Сводка записи">
