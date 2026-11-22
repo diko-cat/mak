@@ -1,30 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { ArrowRight, CheckCircle2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { createAppointment, getCalendarAvailability, getDaySlots } from '../../api'
 import { Button, buttonStyles } from '../../components/ui'
 import type { Appointment, DaySlot } from '../../types'
+import { BookingCalendar } from '../cabinet/BookingCalendar'
 import { EmptyState, LoadingNote, Panel } from '../cabinet/CabinetLayout'
-import { addDays, errorMessage, formatPrice, formatTime, longDayFormat, toDateKey, weekdayFormat } from '../cabinet/format'
+import { addDays, errorMessage, formatPrice, formatTime, longDayFormat, toDateKey } from '../cabinet/format'
 import { AppointmentTicket } from './components'
 import type { usePatientData } from './usePatientData'
 
 const BOOKING_DAYS = 60
-const monthFormat = new Intl.DateTimeFormat('ru-RU', { month: 'long', year: 'numeric' })
-const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 
 function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1)
-}
-
-function monthCells(month: Date): (Date | null)[] {
-  const first = startOfMonth(month)
-  const offset = (first.getDay() + 6) % 7
-  const daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()
-  return [
-    ...Array.from({ length: offset }, () => null),
-    ...Array.from({ length: daysInMonth }, (_, index) => new Date(first.getFullYear(), first.getMonth(), index + 1)),
-  ]
 }
 
 export function PatientBooking({ patient, patientId }: { patient: ReturnType<typeof usePatientData>; patientId: string }) {
@@ -48,9 +37,7 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
 
   const bookingDays = useMemo(() => Array.from({ length: BOOKING_DAYS }, (_, index) => addDays(index)), [])
   const bookingDateKeys = useMemo(() => bookingDays.map(toDateKey), [bookingDays])
-  const calendarDates = useMemo(() => monthCells(visibleMonth), [visibleMonth])
   const firstMonth = startOfMonth(bookingDays[0])
-  const lastMonth = startOfMonth(bookingDays[bookingDays.length - 1])
   const service = serviceOf(serviceId)
   const doctor = doctorOf(doctorId)
   const doctors = useMemo(
@@ -183,47 +170,19 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
 
         <Panel title={<><span className="step-index">3</span>Дата</>}>
           {!doctor ? <EmptyState>Выберите специалиста, чтобы увидеть даты.</EmptyState> : (
-            <div className="booking-calendar" role="group" aria-label="Свободные даты на ближайшие два месяца">
-              <div className="booking-calendar__header">
-                <strong>{monthFormat.format(visibleMonth)}</strong>
-                <div className="booking-calendar__controls">
-                  <button type="button" aria-label="Предыдущий месяц" disabled={visibleMonth.getTime() <= firstMonth.getTime()} onClick={() => changeMonth(-1)}><ArrowLeft size={16} /></button>
-                  <button type="button" aria-label="Следующий месяц" disabled={visibleMonth.getTime() >= lastMonth.getTime()} onClick={() => changeMonth(1)}><ArrowRight size={16} /></button>
-                </div>
-              </div>
-              <div className="booking-calendar__grid booking-calendar__weekdays" aria-hidden="true">
-                {weekDays.map((day) => <span key={day}>{day}</span>)}
-              </div>
-              <div className="booking-calendar__grid">
-                {calendarDates.map((day, index) => {
-                  if (!day) return <span key={`blank-${index}`} className="booking-calendar__blank" />
-                  const key = toDateKey(day)
-                  const availableCount = availability[key] ?? 0
-                  const inBookingWindow = key >= bookingDateKeys[0] && key <= bookingDateKeys[bookingDateKeys.length - 1]
-                  const isAvailable = inBookingWindow && availableCount > 0
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      className={`booking-calendar__day ${isAvailable ? 'booking-calendar__day--available' : ''} ${date === key ? 'booking-calendar__day--selected' : ''}`}
-                      disabled={!isAvailable || calendarLoading}
-                      aria-pressed={date === key}
-                      aria-label={`${weekdayFormat.format(day)} ${day.getDate()} ${monthFormat.format(day)}${isAvailable ? ', есть свободное время' : ', свободного времени нет'}`}
-                      title={isAvailable ? 'Есть свободное время' : 'Свободного времени нет'}
-                      onClick={() => chooseDate(key)}
-                    >
-                      <span>{day.getDate()}</span>
-                      {isAvailable && <i aria-hidden="true" />}
-                    </button>
-                  )
-                })}
-              </div>
-              <p className="booking-calendar__legend"><i aria-hidden="true" />Есть свободное время</p>
-              <p className="booking-calendar__horizon">Показываем доступность на ближайшие 60 дней.</p>
-              {calendarLoading && <LoadingNote>Проверяем свободные даты…</LoadingNote>}
-              {calendarError && <p className="form-message form-message--error" role="alert">{calendarError}</p>}
-              {!calendarLoading && !calendarError && Object.keys(availability).length > 0 && !Object.values(availability).some((count) => count > 0) && <EmptyState>На ближайшие два месяца свободных дат нет.</EmptyState>}
-            </div>
+            <BookingCalendar
+              availability={availability}
+              selectedDate={date}
+              visibleMonth={visibleMonth}
+              minDate={bookingDays[0]}
+              maxDate={bookingDays[bookingDays.length - 1]}
+              loading={calendarLoading}
+              error={calendarError}
+              horizonLabel="Показываем доступность на ближайшие 60 дней."
+              emptyMessage="На ближайшие два месяца свободных дат нет."
+              onSelect={chooseDate}
+              onMonthChange={changeMonth}
+            />
           )}
         </Panel>
 
