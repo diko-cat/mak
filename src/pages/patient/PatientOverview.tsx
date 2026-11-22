@@ -42,15 +42,11 @@ export function PatientOverview({ patient }: { patient: ReturnType<typeof usePat
       <Panel title="Анализы с отклонениями">
         {deviations.length > 0
           ? <div className="stack">{deviations.map((test) => <LabTestCard key={test.id} test={test} doctor={doctorOf(test.doctorId)} onlyDeviations />)}</div>
-<<<<<<< HEAD
           : data.labTests.length === 0
             ? <EmptyState>Анализов пока нет.</EmptyState>
             : readyTests.length === 0
               ? <EmptyState>Результаты появятся здесь после готовности анализов.</EmptyState>
               : <EmptyState>Все готовые показатели в пределах нормы.</EmptyState>}
-=======
-          : <EmptyState>Все готовые показатели в пределах нормы.</EmptyState>}
->>>>>>> 7e5a21ecb13007ff19a3850a9bba50a2107e8166
       </Panel>
     </div>
   )

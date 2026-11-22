@@ -1,10 +1,6 @@
-<<<<<<< HEAD
-import { AlertTriangle, ArrowDown, ArrowUp, FileText } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, FileText, FlaskConical } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { buttonStyles } from '../../components/ui'
-=======
-import { AlertTriangle, ArrowDown, ArrowUp, FileText, FlaskConical } from 'lucide-react'
->>>>>>> 7e5a21ecb13007ff19a3850a9bba50a2107e8166
 import type { Appointment, Doctor, LabTest, MedicalConclusion, Service } from '../../types'
 import { formatDate, formatPrice, formatTime, indicatorState, longDayFormat } from '../cabinet/format'
 
@@ -58,14 +54,7 @@ export function ConclusionCard({ conclusion, doctor, appointment, service }: { c
   )
 }
 
-const labStatus: Record<LabTest['status'], string> = { ordered: 'Назначен', 'in-progress': 'В лаборатории', ready: 'Готов' }
-
-/** Что сейчас происходит с анализом, пока результата нет. */
-const labPending: Record<LabTest['status'], string> = {
-  ordered: 'Врач назначил этот анализ. Сдайте его в процедурном кабинете — результат появится здесь.',
-  'in-progress': 'Анализ сдан и сейчас в лаборатории. Результат появится здесь, как только будет готов.',
-  ready: 'Результат готов, подробности уточните у врача.',
-}
+const labStatus: Record<LabTest['status'], string> = { ordered: 'Назначен', 'in-progress': 'В работе', ready: 'Готов' }
 
 export function hasDeviations(test: LabTest): boolean {
   return Boolean(test.indicators?.some((indicator) => indicatorState(indicator) !== 'normal'))
@@ -111,16 +100,11 @@ export function LabTestCard({ test, doctor, onlyDeviations = false }: { test: La
             })}
           </tbody>
         </table>
-<<<<<<< HEAD
       ) : test.status === 'ready' && !test.result ? (
         <p className="lab__result">Анализ готов. Обратитесь к врачу, назначившему исследование, чтобы получить и обсудить результат.</p>
       ) : null}
       {!onlyDeviations && deviates && <p className="lab__warning"><AlertTriangle size={14} aria-hidden="true" />Есть значения вне нормы — обсудите их с врачом.</p>}
       {deviates && doctor && <div className="row-actions lab__actions"><Link className={buttonStyles('secondary', 'button--compact')} to={`/patient/appointments/new?doctor=${encodeURIComponent(doctor.id)}`}>Записаться к врачу, назначившему анализ</Link></div>}
-=======
-      ) : test.result ? <p className="lab__result">{test.result}</p> : <p className="lab__result lab__result--pending">{labPending[test.status]}</p>}
-      {!onlyDeviations && hasDeviations(test) && <p className="lab__warning"><AlertTriangle size={14} aria-hidden="true" />Есть значения вне нормы — обсудите их с врачом.</p>}
->>>>>>> 7e5a21ecb13007ff19a3850a9bba50a2107e8166
     </article>
   )
 }

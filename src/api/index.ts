@@ -181,20 +181,13 @@ export async function getCalendarAvailability(
   doctorId: string,
   dates: string[],
   durationMinutes = 30,
-<<<<<<< HEAD
-  patientId?: string,
-=======
   ignoreAppointmentId?: string,
->>>>>>> 7e5a21ecb13007ff19a3850a9bba50a2107e8166
+  patientId?: string,
 ): Promise<Record<string, number>> {
   const doctor = readDatabase().doctors.find((entry) => entry.id === doctorId)
   if (!doctor) throw new ApiError('Выбранный врач не найден.', 'DOCTOR_NOT_FOUND')
   const availability = await Promise.all(dates.map(async (date) => {
-<<<<<<< HEAD
-    const slots = await getDaySlots(doctorId, date, durationMinutes, undefined, patientId)
-=======
-    const slots = await getDaySlots(doctorId, date, durationMinutes, ignoreAppointmentId)
->>>>>>> 7e5a21ecb13007ff19a3850a9bba50a2107e8166
+    const slots = await getDaySlots(doctorId, date, durationMinutes, ignoreAppointmentId, patientId)
     return [date, slots.filter((slot) => slot.available).length] as const
   }))
   return Object.fromEntries(availability)
@@ -221,12 +214,9 @@ export async function createAppointment(input: CreateAppointmentInput): Promise<
   if (!doctor) throw new ApiError('Выбранный врач не найден.', 'DOCTOR_NOT_FOUND')
   if (!patient) throw new ApiError('Пациент не найден.', 'PATIENT_NOT_FOUND')
   if (!service) throw new ApiError('Выбранная услуга не найдена.', 'SERVICE_NOT_FOUND')
-<<<<<<< HEAD
+  if (service.active === false) throw new ApiError('Эта услуга снята с записи.', 'SERVICE_ARCHIVED')
   const note = input.note?.trim() ?? ''
   if (!note) throw new ApiError('Укажите причину обращения.', 'VALIDATION_ERROR')
-=======
-  if (service.active === false) throw new ApiError('Эта услуга снята с записи.', 'SERVICE_ARCHIVED')
->>>>>>> 7e5a21ecb13007ff19a3850a9bba50a2107e8166
   if (doctor.active === false) throw new ApiError('Этот врач сейчас не принимает. Выберите другого специалиста.', 'DOCTOR_INACTIVE')
   if (service.specialty && service.specialty !== doctor.specialty) throw new ApiError('Эту услугу оказывает врач другой специальности.', 'DOCTOR_SPECIALTY_MISMATCH')
   if (Number.isNaN(startsAt.getTime())) throw new ApiError('Выберите корректную дату и время.', 'INVALID_APPOINTMENT_TIME')
