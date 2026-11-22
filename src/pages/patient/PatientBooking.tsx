@@ -13,6 +13,9 @@ import type { usePatientData } from './usePatientData'
 const BOOKING_DAYS = 60
 const STEP_TITLES = ['Услуга', 'Врач', 'Дата', 'Время', 'Причина обращения']
 
+const STEPS = ['Услуга', 'Специалист', 'Дата', 'Время', 'Причина'] as const
+const STEP_HINTS = ['Выберите услугу, чтобы продолжить.', 'Выберите специалиста, чтобы продолжить.', 'Выберите дату, чтобы продолжить.', 'Выберите время, чтобы продолжить.', 'Опишите причину обращения, чтобы подтвердить запись.']
+
 function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1)
 }
@@ -49,6 +52,13 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [created, setCreated] = useState<Appointment | null>(null)
+<<<<<<< HEAD
+=======
+  /** Мастер записи: на экране один шаг, переход — кнопками «Назад» и «Продолжить». */
+  const [step, setStep] = useState(1)
+  const [direction, setDirection] = useState<'forward' | 'back'>('forward')
+
+>>>>>>> 7e5a21ecb13007ff19a3850a9bba50a2107e8166
   const bookingDays = useMemo(() => Array.from({ length: BOOKING_DAYS }, (_, index) => addDays(index)), [])
   const bookingDateKeys = useMemo(() => bookingDays.map(toDateKey), [bookingDays])
   const firstMonth = startOfMonth(bookingDays[0])
@@ -186,6 +196,7 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
     setVisibleMonth((month) => new Date(month.getFullYear(), month.getMonth() + offset, 1))
   }
 
+<<<<<<< HEAD
   function editStep(step: number) {
     if (step === 2) {
       setDate('')
@@ -217,6 +228,26 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
   }
 
   const ready = Boolean(service && doctor && date && slot && savedReason)
+=======
+  const ready = Boolean(service && doctor && date && slot && reason.trim())
+  const stepDone = [Boolean(service), Boolean(doctor), Boolean(date), Boolean(slot), ready]
+  const canContinue = stepDone[step - 1]
+
+  function goTo(next: number) {
+    setDirection(next > step ? 'forward' : 'back')
+    setStep(next)
+    setError('')
+    const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    requestAnimationFrame(() => document.getElementById('booking-top')?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' }))
+  }
+
+  const choices = [
+    { step: 1, label: 'Услуга', value: service && `${service.name} · ${formatPrice(service.price)}` },
+    { step: 2, label: 'Специалист', value: doctor && `${doctor.name}, ${doctor.specialty.toLowerCase()}` },
+    { step: 3, label: 'Дата', value: date && longDayFormat.format(new Date(`${date}T00:00:00`)) },
+    { step: 4, label: 'Время', value: slot && `${formatTime(slot)}${doctor?.room ? ` · кабинет ${doctor.room}` : ''}` },
+  ].filter((choice) => choice.value)
+>>>>>>> 7e5a21ecb13007ff19a3850a9bba50a2107e8166
 
   async function confirm() {
     if (!ready) return
@@ -227,6 +258,7 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
       setCreated(appointment)
       await reload()
     } catch (bookingError) {
+<<<<<<< HEAD
       const message = errorMessage(bookingError, 'Не удалось создать запись.')
       setError(message)
       if (isSlotConflict(bookingError, message)) {
@@ -235,6 +267,13 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
         setCalendarVersion((value) => value + 1)
         setActiveStep(4)
       }
+=======
+      setError(errorMessage(bookingError, 'Не удалось создать запись.'))
+      setSlot('')
+      setStep(4)
+      setSlotsVersion((value) => value + 1)
+      setCalendarVersion((value) => value + 1)
+>>>>>>> 7e5a21ecb13007ff19a3850a9bba50a2107e8166
     } finally {
       setSubmitting(false)
     }
@@ -264,7 +303,11 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
         <AppointmentTicket appointment={created} doctor={doctorOf(created.doctorId)} service={serviceOf(created.serviceId)} />
         <div className="row-actions">
           <Link className={buttonStyles('primary')} to="/patient/appointments">Мои записи <ArrowRight size={15} /></Link>
+<<<<<<< HEAD
           <Button variant="secondary" onClick={startAgain}>Записаться ещё</Button>
+=======
+          <Button variant="secondary" onClick={() => { setCreated(null); chooseService(''); setStep(1) }}>Записаться ещё</Button>
+>>>>>>> 7e5a21ecb13007ff19a3850a9bba50a2107e8166
         </div>
       </Panel>
     )
@@ -279,6 +322,7 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
   ]
 
   return (
+<<<<<<< HEAD
     <div className="booking">
       <div className="booking__main">
         <p className="booking-progress" aria-live="polite">Шаг {activeStep} из 5</p>
@@ -405,6 +449,139 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
         </Button>
         {!ready && <p className="muted small">Сначала выберите услугу, врача, дату и время, затем опишите и сохраните причину обращения.</p>}
       </aside>
+=======
+    <div className={`booking-wizard booking-wizard--${direction}`}>
+      <div id="booking-top" className="booking-progress">
+        <p className="booking-progress__label">Шаг {step} из {STEPS.length} · <strong key={step}>{STEPS[step - 1]}</strong></p>
+        <ol className="booking-progress__steps">
+          {STEPS.map((label, index) => (
+            <li key={label} className={index + 1 < step ? 'is-done' : index + 1 === step ? 'is-current' : ''} aria-current={index + 1 === step ? 'step' : undefined}>
+              <span>{label}</span>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      {choices.length > 0 && (
+        <section className="booking-choice" aria-label="Ваш выбор">
+          <p className="eyebrow">ВАШ ВЫБОР</p>
+          <dl>
+            {choices.map((choice) => (
+              <div key={choice.label}>
+                <dt>{choice.label}</dt>
+                <dd>{choice.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
+
+      {step === 1 && <Panel title={<><span className="step-index">1</span>Услуга</>}>
+          <div className="choice-grid">
+            {data.services.map((entry) => (
+              <button key={entry.id} type="button" className={`choice ${serviceId === entry.id ? 'choice--active' : ''}`} aria-pressed={serviceId === entry.id} onClick={() => chooseService(entry.id)}>
+                <strong>{entry.name}</strong>
+                <small>{entry.category} · {entry.durationMinutes} мин</small>
+                <span className="choice__price">{formatPrice(entry.price)}</span>
+              </button>
+            ))}
+          </div>
+        </Panel>}
+      {step === 2 && <Panel title={<><span className="step-index">2</span>Специалист</>}>
+          {doctors.length === 0 ? <EmptyState>Сейчас нет специалистов, которые принимают по этой услуге.</EmptyState> : (
+            <div className="choice-grid">
+              {doctors.map((entry) => (
+                <button key={entry.id} type="button" className={`choice choice--doctor ${doctorId === entry.id ? 'choice--active' : ''}`} aria-pressed={doctorId === entry.id} onClick={() => chooseDoctor(entry.id)}>
+                  <span className="avatar" aria-hidden="true">{entry.initials}</span>
+                  <span><strong>{entry.name}</strong><small>{entry.specialty} · стаж {entry.experienceYears} лет</small></span>
+                </button>
+              ))}
+            </div>
+          )}
+        </Panel>}
+      {step === 3 && <Panel title={<><span className="step-index">3</span>Дата</>}>
+          {(
+            <div className="booking-calendar" role="group" aria-label="Свободные даты на ближайшие два месяца">
+              <div className="booking-calendar__header">
+                <strong>{monthFormat.format(visibleMonth)}</strong>
+                <div className="booking-calendar__controls">
+                  <button type="button" aria-label="Предыдущий месяц" disabled={visibleMonth.getTime() <= firstMonth.getTime()} onClick={() => changeMonth(-1)}><ArrowLeft size={16} /></button>
+                  <button type="button" aria-label="Следующий месяц" disabled={visibleMonth.getTime() >= lastMonth.getTime()} onClick={() => changeMonth(1)}><ArrowRight size={16} /></button>
+                </div>
+              </div>
+              <div className="booking-calendar__grid booking-calendar__weekdays" aria-hidden="true">
+                {weekDays.map((day) => <span key={day}>{day}</span>)}
+              </div>
+              <div className="booking-calendar__grid">
+                {calendarDates.map((day, index) => {
+                  if (!day) return <span key={`blank-${index}`} className="booking-calendar__blank" />
+                  const key = toDateKey(day)
+                  const availableCount = availability[key] ?? 0
+                  const inBookingWindow = key >= bookingDateKeys[0] && key <= bookingDateKeys[bookingDateKeys.length - 1]
+                  const isAvailable = inBookingWindow && availableCount > 0
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      className={`booking-calendar__day ${isAvailable ? 'booking-calendar__day--available' : ''} ${date === key ? 'booking-calendar__day--selected' : ''}`}
+                      disabled={!isAvailable || calendarLoading}
+                      aria-pressed={date === key}
+                      aria-label={`${weekdayFormat.format(day)} ${day.getDate()} ${monthFormat.format(day)}${isAvailable ? ', есть свободное время' : ', свободного времени нет'}`}
+                      title={isAvailable ? 'Есть свободное время' : 'Свободного времени нет'}
+                      onClick={() => chooseDate(key)}
+                    >
+                      <span>{day.getDate()}</span>
+                      {isAvailable && <i aria-hidden="true" />}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="booking-calendar__legend"><i aria-hidden="true" />Есть свободное время</p>
+              <p className="booking-calendar__horizon">Показываем доступность на ближайшие 60 дней.</p>
+              {calendarLoading && <LoadingNote>Проверяем свободные даты…</LoadingNote>}
+              {calendarError && <p className="form-message form-message--error" role="alert">{calendarError}</p>}
+              {!calendarLoading && !calendarError && Object.keys(availability).length > 0 && !Object.values(availability).some((count) => count > 0) && <EmptyState>На ближайшие два месяца свободных дат нет.</EmptyState>}
+            </div>
+          )}
+        </Panel>}
+      {step === 4 && <Panel title={<><span className="step-index">4</span>Время</>}>
+          {loadingSlots ? <LoadingNote>Загружаем расписание…</LoadingNote> : slots.some((entry) => entry.available) ? (
+            <>
+              <div className="slot-grid">
+                {slots.map((entry) => (
+                  <button
+                    key={entry.startsAt}
+                    type="button"
+                    className={`slot ${slot === entry.startsAt ? 'slot--active' : ''}`}
+                    disabled={!entry.available}
+                    aria-pressed={slot === entry.startsAt}
+                    title={entry.reason === 'busy' ? 'Время занято' : entry.reason === 'past' ? 'Время уже прошло' : undefined}
+                    onClick={() => { setSlot(entry.startsAt); setError('') }}
+                  >
+                    {formatTime(entry.startsAt)}
+                  </button>
+                ))}
+              </div>
+              <p className="slot-legend"><span className="slot-legend__free" />свободно <span className="slot-legend__busy" />занято или прошло</p>
+            </>
+          ) : <EmptyState>На эту дату свободного времени нет. Выберите другой день.</EmptyState>}
+        </Panel>}
+      {step === 5 && <Panel title={<><span className="step-index">5</span>Причина обращения</>}>
+          <label className="form-field cabinet-field">
+            <span>Опишите, что вас беспокоит</span>
+            <textarea rows={3} value={reason} maxLength={500} placeholder="Например: болит голова по утрам уже неделю" onChange={(event) => setReason(event.target.value)} />
+          </label>
+        </Panel>}
+
+      {error && <p className="form-message form-message--error" role="alert">{error}</p>}
+      <div className="booking-nav">
+        {step > 1 ? <Button variant="secondary" onClick={() => goTo(step - 1)}><ArrowLeft size={16} /> Назад</Button> : <span />}
+        {step < STEPS.length
+          ? <Button key={`next-${step}-${canContinue}`} className={canContinue ? 'booking-nav__ready' : ''} disabled={!canContinue} onClick={() => goTo(step + 1)}>Продолжить <ArrowRight size={16} /></Button>
+          : <Button disabled={!ready || submitting} onClick={confirm}>{submitting ? 'Записываем…' : 'Подтвердить запись'} <ArrowRight size={16} /></Button>}
+      </div>
+      {!canContinue && <p className="booking-nav__hint">{STEP_HINTS[step - 1]}</p>}
+>>>>>>> 7e5a21ecb13007ff19a3850a9bba50a2107e8166
     </div>
   )
 }

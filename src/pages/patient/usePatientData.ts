@@ -29,7 +29,7 @@ export function usePatientData(patientId: string | undefined) {
         getDoctors(),
         getServices(),
       ])
-      setData({ appointments, conclusions, labTests, doctors, services })
+      setData({ appointments, conclusions, labTests, doctors, services: services.filter((service) => service.active !== false) })
       setError('')
     } catch (loadError) {
       setError(errorMessage(loadError, 'Не удалось загрузить данные кабинета.'))

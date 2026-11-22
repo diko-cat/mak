@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { getAppointments, getConclusions, getPatients, getServices } from '../../api'
-import type { Appointment, MedicalConclusion, Patient, Service } from '../../types'
+import { getAppointments, getConclusions, getLabTests, getPatients, getServices } from '../../api'
+import type { Appointment, LabTest, MedicalConclusion, Patient, Service } from '../../types'
 import { errorMessage } from '../cabinet/format'
 
 export interface DoctorData {
@@ -9,6 +9,7 @@ export interface DoctorData {
   /** Только пациенты, у которых есть запись к этому врачу. */
   patients: Patient[]
   services: Service[]
+  labTests: LabTest[]
 }
 
 /** Врач получает только свои записи, свои заключения и своих пациентов. */
@@ -22,14 +23,15 @@ export function useDoctorData(doctorId: string | undefined) {
       return
     }
     try {
-      const [appointments, conclusions, allPatients, services] = await Promise.all([
+      const [appointments, conclusions, allPatients, services, labTests] = await Promise.all([
         getAppointments({ doctorId }),
         getConclusions({ doctorId }),
         getPatients(),
         getServices(),
+        getLabTests(),
       ])
       const ownPatientIds = new Set(appointments.map((appointment) => appointment.patientId))
-      setData({ appointments, conclusions, patients: allPatients.filter((patient) => ownPatientIds.has(patient.id)), services })
+      setData({ appointments, conclusions, patients: allPatients.filter((patient) => ownPatientIds.has(patient.id)), services, labTests })
       setError('')
     } catch (loadError) {
       setError(errorMessage(loadError, 'Не удалось загрузить данные кабинета.'))

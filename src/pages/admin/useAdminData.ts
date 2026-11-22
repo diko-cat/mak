@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { getAppointments, getCallRequests, getDoctors, getPatients, getServices } from '../../api'
-import type { Appointment, CallRequest, Doctor, Patient, Service } from '../../types'
+import { getAppointments, getCallRequests, getDoctors, getLabTests, getPatients, getServices } from '../../api'
+import type { Appointment, CallRequest, Doctor, LabTest, Patient, Service } from '../../types'
 import { errorMessage } from '../cabinet/format'
 
 export interface AdminData {
@@ -9,6 +9,7 @@ export interface AdminData {
   doctors: Doctor[]
   patients: Patient[]
   services: Service[]
+  labTests: LabTest[]
 }
 
 /** Все данные клиники для администратора и функция перезагрузки после изменений. */
@@ -18,10 +19,10 @@ export function useAdminData() {
 
   const reload = useCallback(async () => {
     try {
-      const [appointments, callRequests, doctors, patients, services] = await Promise.all([
-        getAppointments(), getCallRequests(), getDoctors(), getPatients(), getServices(),
+      const [appointments, callRequests, doctors, patients, services, labTests] = await Promise.all([
+        getAppointments(), getCallRequests(), getDoctors(), getPatients(), getServices(), getLabTests(),
       ])
-      setData({ appointments, callRequests, doctors, patients, services })
+      setData({ appointments, callRequests, doctors, patients, services, labTests })
       setError('')
     } catch (loadError) {
       setError(errorMessage(loadError, 'Не удалось загрузить данные панели.'))

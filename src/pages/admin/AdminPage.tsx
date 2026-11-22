@@ -37,7 +37,7 @@ export function AdminPage() {
           {allowed('doctors:manage') && <Route path="doctors" element={<AdminDoctors admin={admin} />} />}
           {allowed('schedule:manage') && <Route path="schedule" element={<AdminSchedule admin={admin} />} />}
           {allowed('services:manage') && <Route path="services" element={<AdminServices admin={admin} />} />}
-          <Route path="access" element={<AdminAccess />} />
+          <Route path="access" element={<AdminAccess onReset={admin.reload} />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       )}

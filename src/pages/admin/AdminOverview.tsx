@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { updateCallRequestStatus } from '../../api'
 import { intervalFor, SLOT_STEP_MINUTES, toMinutes } from '../../api/schedule'
+import { fitsWorkingHours } from '../../api/schedule'
 import { Button } from '../../components/ui'
 import { EmptyState, Panel, StatusPill } from '../cabinet/CabinetLayout'
 import { errorMessage, formatDateTime, formatPrice, isSameDay, isScheduled, toDateKey } from '../cabinet/format'
@@ -15,14 +16,20 @@ export function AdminOverview({ admin }: { admin: AdminState }) {
   const today = toDateKey(new Date())
   const todayAppointments = data.appointments.filter((item) => isSameDay(item.startsAt, today) && item.status !== 'cancelled')
   const pending = data.appointments.filter((item) => item.status === 'requested')
+  const needsTransfer = data.appointments.filter((item) => {
+    if (!isScheduled(item) || new Date(item.startsAt).getTime() <= Date.now()) return false
+    const doctor = doctorOf(item.doctorId)
+    return Boolean(doctor && (doctor.active === false || !fitsWorkingHours(doctor, new Date(item.startsAt), serviceOf(item.serviceId)?.durationMinutes ?? 30)))
+  })
   const newRequests = data.callRequests.filter((item) => item.status === 'new')
-  const activeDoctors = data.doctors.filter((doctor) => doctor.active !== false)
+  const activeDoctors = data.doctors.filter((doctor) => doctor.active !== false && intervalFor(doctor, today) !== null)
   const revenue = todayAppointments.reduce((sum, item) => sum + (serviceOf(item.serviceId)?.price ?? 0), 0)
   const upcoming = data.appointments.filter((item) => isScheduled(item) && new Date(item.startsAt).getTime() > Date.now()).slice(0, 5)
 
   const stats: [string, string | number][] = [
     ['Записей сегодня', todayAppointments.length],
     ['Ждут подтверждения', pending.length],
+    ['Требуют переноса', needsTransfer.length],
     ['Врачей принимает', activeDoctors.length],
     ['Ожидаемая выручка', formatPrice(revenue)],
   ]
@@ -43,6 +50,8 @@ export function AdminOverview({ admin }: { admin: AdminState }) {
       </div>
 
       {error && <p className="form-message form-message--error cabinet-grid__wide" role="alert">{error}</p>}
+
+      {needsTransfer.length > 0 && <Panel title={`Изменения расписания · ${needsTransfer.length}`}><Link className="text-link" to="/admin/appointments?status=requires-transfer">Открыть записи, требующие переноса <ArrowRight size={13} /></Link></Panel>}
 
       <Panel title="Загрузка врачей сегодня" className="cabinet-grid__wide">
         <ul className="admin-list">

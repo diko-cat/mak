@@ -1,14 +1,18 @@
-import { ArrowUpRight, Menu, Moon, Sun, UserRound } from 'lucide-react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useSession, clearSession } from '../../store/session'
+import { ArrowUpRight, Menu, Moon, Sun } from 'lucide-react'
+import { useEffect, useRef } from 'react'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { getDemoCredentials, login } from '../../api'
+import { useSession, clearSession, setSession } from '../../store/session'
 import { toggleTheme, useTheme } from '../../store/theme'
 import type { Role } from '../../types'
+import { RoleMenu } from './RoleMenu'
 
-const roleNames: Record<Role, string> = {
-  patient: 'Пациент',
-  doctor: 'Врач',
-  admin: 'Администратор',
-}
+export const siteLinks = [
+  { to: '/about', label: 'О клинике' },
+  { to: '/services', label: 'Услуги' },
+  { to: '/doctors', label: 'Врачи' },
+  { to: '/contacts', label: 'Контакты' },
+]
 
 export function roleHomePath(role: Role): string {
   return `/${role}`
@@ -18,13 +22,33 @@ export function SiteHeader() {
   const user = useSession()
   const theme = useTheme()
   const navigate = useNavigate()
+  const { pathname, key: locationKey } = useLocation()
+  const signingOut = useRef(false)
+  const menuRef = useRef<HTMLDetailsElement>(null)
 
-  function switchRole(role: Role) {
-    navigate(`/login?role=${role}`)
+  useEffect(() => {
+    if (!signingOut.current) return
+    signingOut.current = false
+    clearSession()
+  }, [locationKey])
+
+  // Мобильное меню закрывается после любого перехода.
+  useEffect(() => { menuRef.current?.removeAttribute('open') }, [pathname])
+
+  /** «Войти как…»: сразу входим демо-аккаунтом выбранной роли и открываем её кабинет. */
+  async function switchRole(role: Role) {
+    try {
+      setSession(await login(await getDemoCredentials(role)))
+      navigate(roleHomePath(role))
+    } catch {
+      clearSession()
+      navigate(`/login?role=${role}`)
+    }
   }
 
   function signOut() {
-    clearSession()
+    // Сессию очищаем уже на главной: иначе защита кабинета успевает перекинуть на страницу входа.
+    signingOut.current = true
     navigate('/', { state: { notice: 'Вы вышли из демо-аккаунта.' } })
   }
 
@@ -37,33 +61,18 @@ export function SiteHeader() {
         </Link>
 
         <nav className="site-nav" aria-label="Основная навигация">
-          <a href="/#about">О клинике</a>
-          <a href="/#services">Услуги</a>
-          <a href="/#doctors">Врачи</a>
-          <a href="/#contacts">Контакты</a>
+          {siteLinks.map(({ to, label }) => <NavLink key={to} to={to}>{label}</NavLink>)}
         </nav>
 
-        <details className="mobile-menu">
+        <details className="mobile-menu" ref={menuRef}>
           <summary aria-label="Открыть меню"><Menu size={19} /></summary>
           <nav aria-label="Мобильная навигация">
-            <a href="/#about" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>О клинике</a>
-            <a href="/#services" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>Услуги</a>
-            <a href="/#doctors" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>Врачи</a>
-            <a href="/#contacts" onClick={(event) => event.currentTarget.closest('details')?.removeAttribute('open')}>Контакты</a>
+            {siteLinks.map(({ to, label }) => <NavLink key={to} to={to} onClick={() => menuRef.current?.removeAttribute('open')}>{label}</NavLink>)}
           </nav>
         </details>
 
         <div className="site-header__actions">
-          <label className="demo-role-switcher" title="Выбрать демо-роль">
-            <UserRound size={15} aria-hidden="true" />
-            <select
-              aria-label="Демо-роль"
-              value={user?.role ?? 'patient'}
-              onChange={(event) => switchRole(event.target.value as Role)}
-            >
-              {Object.entries(roleNames).map(([role, name]) => <option key={role} value={role}>{name}</option>)}
-            </select>
-          </label>
+          <RoleMenu currentRole={user?.role} onSelect={switchRole} onSignOut={signOut} />
           <button className="theme-toggle" type="button" onClick={toggleTheme} aria-label={theme === 'light' ? 'Включить тёмную тему' : 'Включить светлую тему'}>
             {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
           </button>
@@ -72,11 +81,8 @@ export function SiteHeader() {
               <Link className="button button--primary header-account__link" to={roleHomePath(user.role)}>
                 Кабинет <ArrowUpRight size={15} />
               </Link>
-              <button className="header-account__logout" type="button" onClick={signOut}>Выйти</button>
             </div>
-          ) : (
-            <Link className="button button--secondary header-login" to="/login">Войти <ArrowUpRight size={15} /></Link>
-          )}
+          ) : null}
         </div>
       </div>
     </header>

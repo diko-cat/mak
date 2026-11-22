@@ -23,7 +23,9 @@ export interface MockDatabase {
   callRequests: CallRequest[]
 }
 
-export const DATABASE_KEY = 'sana-clinic.database.v4'
+export const DATABASE_KEY = 'sana-clinic.database.v5'
+const LEGACY_DATABASE_KEY = 'sana-clinic.database.v4'
+const DEMO_DAY_KEY = `${DATABASE_KEY}.seed-day.v2`
 
 const atDayAndHour = (dayOffset: number, hour: number, minute = 0) => {
   const value = new Date()
@@ -32,16 +34,118 @@ const atDayAndHour = (dayOffset: number, hour: number, minute = 0) => {
   return value.toISOString()
 }
 
+function localDayKey(date = new Date()): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+/** Keep at least one demo visit later today whenever the doctor's schedule allows it. */
+function todayDemoAppointments(): { first: string; second: string; firstServiceId: string } {
+  const now = new Date()
+  const first = new Date(now)
+  first.setHours(0, 0, 0, 0)
+  const elapsedToday = now.getTime() - first.getTime()
+  first.setMinutes(Math.ceil((elapsedToday + 1) / (30 * 60_000)) * 30)
+  const opening = new Date(now)
+  opening.setHours(9, 0, 0, 0)
+  if (first < opening) first.setTime(opening.getTime())
+
+  const tomorrowAt = (hour: number) => {
+    const value = new Date(now)
+    value.setDate(value.getDate() + 1)
+    value.setHours(hour, 0, 0, 0)
+    return value
+  }
+  const closingMinutes = 23 * 60 + 30
+  const firstMinutes = first.getHours() * 60 + first.getMinutes()
+  const firstServiceId = firstMinutes + 45 <= closingMinutes ? 'service-1' : 'service-2'
+  const firstDuration = firstServiceId === 'service-1' ? 45 : 30
+  if (firstMinutes + firstDuration > closingMinutes) {
+    const nextFirst = tomorrowAt(9)
+    const nextSecond = tomorrowAt(11)
+    return { first: nextFirst.toISOString(), second: nextSecond.toISOString(), firstServiceId: 'service-1' }
+  }
+
+  const secondMinutes = Math.ceil((firstMinutes + firstDuration) / 30) * 30
+  const second = new Date(first)
+  second.setHours(Math.floor(secondMinutes / 60), secondMinutes % 60, 0, 0)
+  if (secondMinutes + 30 > closingMinutes) second.setTime(tomorrowAt(11).getTime())
+  const iso = (value: Date) => value.toISOString()
+  return { first: iso(first), second: iso(second), firstServiceId }
+}
+
+function refreshDailyDemoAppointments(database: MockDatabase): void {
+  if (typeof window === 'undefined') return
+  const today = localDayKey()
+  if (window.localStorage.getItem(DEMO_DAY_KEY) === today) return
+  const demoDoctor = database.doctors.find((doctor) => doctor.id === 'doctor-1')
+  const priorDemoHours = Object.values(demoDoctor?.workingHours ?? {})
+  if (demoDoctor && priorDemoHours.length === 7 && priorDemoHours.every((interval) => interval?.start === '09:00' && interval.end === '21:00')) {
+    demoDoctor.workingHours = weekdayHours('09:00', '23:30', [0, 1, 2, 3, 4, 5, 6])
+  }
+  const { first, second, firstServiceId } = todayDemoAppointments()
+  const firstSeed = database.appointments.find((appointment) => appointment.id === 'appointment-7')
+  const secondSeed = database.appointments.find((appointment) => appointment.id === 'appointment-8')
+  if (firstSeed) {
+    firstSeed.startsAt = first
+    firstSeed.serviceId = firstServiceId
+    firstSeed.status = 'confirmed'
+    delete firstSeed.cancelledBy
+    delete firstSeed.cancellationReason
+  }
+  if (secondSeed) {
+    secondSeed.startsAt = second
+    secondSeed.status = 'requested'
+    delete secondSeed.cancelledBy
+    delete secondSeed.cancellationReason
+  }
+  window.localStorage.setItem(DEMO_DAY_KEY, today)
+  writeDatabase(database)
+}
+
+function migrateDaysOff(database: MockDatabase): boolean {
+  let migrated = false
+  for (const doctor of database.doctors) {
+    if (!doctor.daysOff?.length) continue
+    const current = doctor.absences ?? []
+    const dates = [...new Set(doctor.daysOff)].sort()
+    const converted: NonNullable<Doctor['absences']> = []
+    let from = dates[0]
+    let previous = from
+    for (const date of dates.slice(1)) {
+      const [year, month, day] = date.split('-').map(Number)
+      const [previousYear, previousMonth, previousDay] = previous.split('-').map(Number)
+      const gap = (Date.UTC(year, month - 1, day) - Date.UTC(previousYear, previousMonth - 1, previousDay)) / 86_400_000
+      if (gap > 1) {
+        converted.push({ from, to: previous, reason: 'Отпуск' })
+        from = date
+      }
+      previous = date
+    }
+    if (from) converted.push({ from, to: previous, reason: 'Отпуск' })
+    doctor.absences = [...current, ...converted]
+    delete doctor.daysOff
+    migrated = true
+  }
+  return migrated
+}
+
+/** YYYY-MM-DD через `dayOffset` дней от сегодня, в локальном времени. */
+const dayKey = (dayOffset: number) => {
+  const value = new Date()
+  value.setDate(value.getDate() + dayOffset)
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+}
+
 export function createSeedDatabase(): MockDatabase {
   const doctors: Doctor[] = [
-    { id: 'doctor-1', name: 'Айгерим Сейтова', specialty: 'Кардиолог', profession: 'physician', description: 'Профилактика и лечение заболеваний сердца. Объясняет сложное простыми словами.', experienceYears: 14, rating: 4.9, initials: 'АС', accent: 'sage', room: '204', workingHours: weekdayHours('09:00', '18:00', [0, 1, 2, 3, 4, 5, 6]) },
-    { id: 'doctor-2', name: 'Данияр Ахметов', specialty: 'Невролог', profession: 'physician', description: 'Помогает вернуть спокойный сон, ясность и свободу движения.', experienceYears: 11, rating: 4.9, initials: 'ДА', accent: 'blue', room: '208', workingHours: weekdayHours('09:00', '17:00', [1, 2, 3, 4, 5, 6, 0]) },
-    { id: 'doctor-3', name: 'Жанна Ким', specialty: 'Педиатр', profession: 'physician', description: 'Бережно заботится о детях и всегда находит общий язык с родителями.', experienceYears: 16, rating: 5.0, initials: 'ЖК', accent: 'rose', room: '112', workingHours: weekdayHours('08:00', '16:00', [1, 2, 3, 4, 5, 6, 0]) },
-    { id: 'doctor-4', name: 'Марат Нурланов', specialty: 'Дерматолог', profession: 'physician', description: 'Доказательный подход к здоровью кожи и её ежедневному уходу.', experienceYears: 9, rating: 4.8, initials: 'МН', accent: 'sand', room: '305', workingHours: weekdayHours('10:00', '18:00', [1, 2, 3, 4, 5, 6, 0]) },
-    { id: 'doctor-5', name: 'Алина Омарова', specialty: 'Гинеколог', profession: 'physician', description: 'Деликатные консультации и внимание к каждому этапу жизни.', experienceYears: 12, rating: 4.9, initials: 'АО', accent: 'lilac', room: '210', workingHours: weekdayHours('09:00', '17:00', [1, 2, 3, 4, 5]) },
-    { id: 'doctor-6', name: 'Руслан Ибраев', specialty: 'Врач УЗИ', profession: 'physician', description: 'Точная диагностика и подробные ответы сразу после исследования.', experienceYears: 10, rating: 4.8, initials: 'РИ', accent: 'mint', room: '118', workingHours: weekdayHours('08:00', '14:00', [1, 2, 3, 4, 5, 6]) },
-    { id: 'doctor-7', name: 'Гульнара Бекова', specialty: 'Лаборант', profession: 'clinical-specialist', description: 'Аккуратный и почти незаметный забор анализов, результаты — в личном кабинете.', experienceYears: 8, rating: 4.9, initials: 'ГБ', accent: 'sage', room: '101', workingHours: weekdayHours('08:00', '12:00', [1, 2, 3, 4, 5, 6, 0]) },
-    { id: 'doctor-8', name: 'Ержан Тулегенов', specialty: 'Кардиолог', profession: 'physician', description: 'Кардиолог-аритмолог. Сейчас в отпуске, запись временно закрыта.', experienceYears: 18, rating: 4.8, initials: 'ЕТ', accent: 'blue', room: '206', active: false, workingHours: weekdayHours('09:00', '17:00', [1, 2, 3, 4, 5]) },
+    { id: 'doctor-1', name: 'Айгерим Сейтова', specialty: 'Кардиолог', profession: 'physician', description: 'Профилактика и лечение заболеваний сердца. Объясняет сложное простыми словами.', experienceYears: 14, education: 'КазНМУ им. С. Асфендиярова, ординатура по кардиологии; стажировка в Национальном научном кардиохирургическом центре', rating: 4.9, initials: 'АС', accent: 'sage', room: '204', workingHours: weekdayHours('09:00', '23:30', [0, 1, 2, 3, 4, 5, 6]) },
+    { id: 'doctor-2', name: 'Данияр Ахметов', specialty: 'Невролог', profession: 'physician', description: 'Помогает вернуть спокойный сон, ясность и свободу движения.', experienceYears: 11, education: 'Медицинский университет Астана, ординатура по неврологии; курс по лечению головной боли', rating: 4.9, initials: 'ДА', accent: 'blue', room: '208', workingHours: weekdayHours('09:00', '17:00', [1, 2, 3, 4, 5, 6, 0]) },
+    { id: 'doctor-3', name: 'Жанна Ким', specialty: 'Педиатр', profession: 'physician', description: 'Бережно заботится о детях и всегда находит общий язык с родителями.', experienceYears: 16, education: 'КазНМУ им. С. Асфендиярова, ординатура по педиатрии; сертификат IBCLC по грудному вскармливанию', rating: 5.0, initials: 'ЖК', accent: 'rose', room: '112', workingHours: weekdayHours('08:00', '16:00', [1, 2, 3, 4, 5, 6, 0]) },
+    { id: 'doctor-4', name: 'Марат Нурланов', specialty: 'Дерматолог', profession: 'physician', description: 'Доказательный подход к здоровью кожи и её ежедневному уходу.', experienceYears: 9, education: 'Медицинский университет Караганды, ординатура по дерматовенерологии; курс дерматоскопии', rating: 4.8, initials: 'МН', accent: 'sand', room: '305', workingHours: weekdayHours('10:00', '18:00', [1, 2, 3, 4, 5, 6, 0]) },
+    { id: 'doctor-5', name: 'Алина Омарова', specialty: 'Гинеколог', profession: 'physician', description: 'Деликатные консультации и внимание к каждому этапу жизни.', experienceYears: 12, education: 'КазНМУ им. С. Асфендиярова, ординатура по акушерству и гинекологии', rating: 4.9, initials: 'АО', accent: 'lilac', room: '210', absences: [{ from: dayKey(0), to: dayKey(9), reason: 'Отпуск' }], workingHours: weekdayHours('09:00', '17:00', [1, 2, 3, 4, 5]) },
+    { id: 'doctor-6', name: 'Руслан Ибраев', specialty: 'Врач УЗИ', profession: 'physician', description: 'Точная диагностика и подробные ответы сразу после исследования.', experienceYears: 10, education: 'Медицинский университет Семей, ординатура по лучевой диагностике; сертификат экспертного УЗИ', rating: 4.8, initials: 'РИ', accent: 'mint', room: '118', workingHours: weekdayHours('08:00', '14:00', [1, 2, 3, 4, 5, 6]) },
+    { id: 'doctor-7', name: 'Гульнара Бекова', specialty: 'Лаборант', profession: 'clinical-specialist', description: 'Аккуратный и почти незаметный забор анализов, результаты — в личном кабинете.', experienceYears: 8, education: 'Медицинский колледж Алматы, специальность «Лабораторная диагностика»', rating: 4.9, initials: 'ГБ', accent: 'sage', room: '101', workingHours: weekdayHours('08:00', '12:00', [1, 2, 3, 4, 5, 6, 0]) },
+    { id: 'doctor-8', name: 'Ержан Тулегенов', specialty: 'Кардиолог', profession: 'physician', description: 'Кардиолог-аритмолог. Сейчас в отпуске, запись временно закрыта.', experienceYears: 18, education: 'КазНМУ им. С. Асфендиярова, ординатура по кардиологии; курс по аритмологии', rating: 4.8, initials: 'ЕТ', accent: 'blue', room: '206', active: false, workingHours: weekdayHours('09:00', '17:00', [1, 2, 3, 4, 5]) },
   ]
 
   const patients: Patient[] = [
@@ -64,6 +168,7 @@ export function createSeedDatabase(): MockDatabase {
     { id: 'service-9', name: 'Биохимический анализ крови', category: 'Лаборатория', description: 'Базовый профиль из 12 показателей', price: 9500, durationMinutes: 15, specialty: 'Лаборант' },
     { id: 'service-10', name: 'Комплекс «Здоровое сердце»', category: 'Кардиология', description: 'Приём кардиолога, ЭКГ и базовые анализы', price: 24500, durationMinutes: 60, specialty: 'Кардиолог' },
   ]
+  const demoToday = todayDemoAppointments()
 
   return {
     clinic: {
@@ -71,12 +176,15 @@ export function createSeedDatabase(): MockDatabase {
       name: 'Клиника «Сана»',
       tagline: 'Здоровье начинается с внимания',
       description: 'Мы создали пространство, где современная медицина встречается с человеческим отношением. Внимательно слушаем, объясняем каждый шаг и вместе находим решение.',
-      address: '',
-      phone: '',
-      email: '',
-      workingHours: 'Демо-запись · 09:00–17:00',
+      // Условные демо-контакты, не принадлежат реальной клинике.
+      address: 'г. Алматы, ул. Демонстрационная, 15',
+      phone: '+7 727 000 00 00',
+      email: 'hello@sana.demo',
+      workingHours: 'Ежедневно 08:00–18:00',
     },
-    doctors,
+    doctors: doctors.map((doctor) => doctor.id === 'doctor-1'
+      ? { ...doctor, workingHours: weekdayHours('09:00', '23:30', [0, 1, 2, 3, 4, 5, 6]) }
+      : doctor),
     services,
     patients,
     accounts: [
@@ -91,8 +199,8 @@ export function createSeedDatabase(): MockDatabase {
       { id: 'appointment-4', patientId: patients[3].id, doctorId: doctors[3].id, serviceId: services[4].id, startsAt: atDayAndHour(4, 14), status: 'requested', note: 'Сыпь на руках', ticketNumber: 'Т-104' },
       { id: 'appointment-5', patientId: patients[0].id, doctorId: doctors[0].id, serviceId: services[0].id, startsAt: atDayAndHour(-18, 12), status: 'completed', note: 'Перебои в работе сердца', ticketNumber: 'Т-088' },
       { id: 'appointment-6', patientId: patients[0].id, doctorId: doctors[3].id, serviceId: services[4].id, startsAt: atDayAndHour(-10, 15), status: 'cancelled', note: 'Консультация по уходу за кожей', ticketNumber: 'Т-093' },
-      { id: 'appointment-7', patientId: patients[3].id, doctorId: doctors[0].id, serviceId: services[0].id, startsAt: atDayAndHour(0, 11), status: 'confirmed', note: 'Повышенное давление по утрам', ticketNumber: 'Т-105' },
-      { id: 'appointment-8', patientId: patients[1].id, doctorId: doctors[0].id, serviceId: services[1].id, startsAt: atDayAndHour(0, 16), status: 'requested', note: 'Контрольная ЭКГ', ticketNumber: 'Т-106' },
+      { id: 'appointment-7', patientId: patients[3].id, doctorId: doctors[0].id, serviceId: demoToday.firstServiceId === 'service-1' ? services[0].id : services[1].id, startsAt: demoToday.first, status: 'confirmed', note: 'Повышенное давление по утрам', ticketNumber: 'Т-105' },
+      { id: 'appointment-8', patientId: patients[1].id, doctorId: doctors[0].id, serviceId: services[1].id, startsAt: demoToday.second, status: 'requested', note: 'Контрольная ЭКГ', ticketNumber: 'Т-106' },
       { id: 'appointment-9', patientId: patients[2].id, doctorId: doctors[0].id, serviceId: services[9].id, startsAt: atDayAndHour(1, 10), status: 'confirmed', note: 'Профилактический чек-ап', ticketNumber: 'Т-107' },
       { id: 'appointment-10', patientId: patients[3].id, doctorId: doctors[0].id, serviceId: services[1].id, startsAt: atDayAndHour(-30, 10), status: 'completed', note: 'Головокружение, скачки давления', ticketNumber: 'Т-071' },
       { id: 'appointment-11', patientId: patients[1].id, doctorId: doctors[1].id, serviceId: services[2].id, startsAt: atDayAndHour(-7, 15), status: 'completed', note: 'Приступы головной боли', ticketNumber: 'Т-091' },
@@ -137,14 +245,40 @@ export function readDatabase(): MockDatabase {
   const raw = window.localStorage.getItem(DATABASE_KEY)
   if (raw) {
     try {
-      return JSON.parse(raw) as MockDatabase
+      const database = JSON.parse(raw) as MockDatabase
+      if (migrateDaysOff(database)) writeDatabase(database)
+      refreshDailyDemoAppointments(database)
+      return database
     } catch {
       window.localStorage.removeItem(DATABASE_KEY)
     }
   }
 
+  const legacyRaw = window.localStorage.getItem(LEGACY_DATABASE_KEY)
+  if (legacyRaw) {
+    try {
+      const database = JSON.parse(legacyRaw) as MockDatabase
+      migrateDaysOff(database)
+      writeDatabase(database)
+      refreshDailyDemoAppointments(database)
+      return database
+    } catch {
+      window.localStorage.removeItem(LEGACY_DATABASE_KEY)
+    }
+  }
+
   const database = createSeedDatabase()
   writeDatabase(database)
+  window.localStorage.setItem(DEMO_DAY_KEY, localDayKey())
+  return database
+}
+
+/** Replace local demo data while leaving the signed-in session in place. */
+export function resetDemoDatabase(): MockDatabase {
+  if (typeof window !== 'undefined') window.localStorage.removeItem(DEMO_DAY_KEY)
+  const database = createSeedDatabase()
+  writeDatabase(database)
+  if (typeof window !== 'undefined') window.localStorage.setItem(DEMO_DAY_KEY, localDayKey())
   return database
 }
 

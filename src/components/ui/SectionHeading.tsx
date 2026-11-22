@@ -5,13 +5,15 @@ interface SectionHeadingProps {
   title: ReactNode
   description?: string
   align?: 'left' | 'center'
+  /** `h1` — когда секция открыта отдельной страницей. */
+  as?: 'h1' | 'h2'
 }
 
-export function SectionHeading({ eyebrow, title, description, align = 'left' }: SectionHeadingProps) {
+export function SectionHeading({ eyebrow, title, description, align = 'left', as: Heading = 'h2' }: SectionHeadingProps) {
   return (
     <div className={`section-heading section-heading--${align}`}>
       {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-      <h2>{title}</h2>
+      <Heading>{title}</Heading>
       {description && <p className="section-heading__description">{description}</p>}
     </div>
   )

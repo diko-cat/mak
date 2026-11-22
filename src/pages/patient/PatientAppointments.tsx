@@ -8,11 +8,12 @@ import { EmptyState, LoadingNote, Panel, StatusPill } from '../cabinet/CabinetLa
 import { errorMessage, formatDate, formatPrice, formatTime, isScheduled } from '../cabinet/format'
 import type { usePatientData } from './usePatientData'
 
-type Group = 'scheduled' | 'completed' | 'cancelled'
+type Group = 'scheduled' | 'completed' | 'cancelled' | 'no-show'
 const groups: { id: Group; label: string; empty: string }[] = [
   { id: 'scheduled', label: 'Запланированные', empty: 'Запланированных приёмов нет.' },
   { id: 'completed', label: 'Завершённые', empty: 'Завершённых приёмов пока нет.' },
   { id: 'cancelled', label: 'Отменённые', empty: 'Отменённых записей нет.' },
+  { id: 'no-show', label: 'Не явился', empty: 'Записей с неявкой нет.' },
 ]
 
 export function PatientAppointments({ patient }: { patient: ReturnType<typeof usePatientData> }) {
@@ -28,6 +29,7 @@ export function PatientAppointments({ patient }: { patient: ReturnType<typeof us
     scheduled: data.appointments.filter(isScheduled),
     completed: data.appointments.filter((item) => item.status === 'completed').reverse(),
     cancelled: data.appointments.filter((item) => item.status === 'cancelled').reverse(),
+    'no-show': data.appointments.filter((item) => item.status === 'no-show').reverse(),
   }
 
   async function cancel(id: string) {
@@ -79,9 +81,14 @@ export function PatientAppointments({ patient }: { patient: ReturnType<typeof us
                   <strong>{serviceName}</strong>
                   <span>{doctor?.name ?? 'Врач'}{doctor?.specialty ? ` · ${doctor.specialty}` : ''}</span>
                   {appointment.note && <span className="muted">Причина: {appointment.note}</span>}
+<<<<<<< HEAD
                   {appointment.status === 'requested' && <span className="appointment-row__status-note">Администратор подтвердит заявку и позвонит вам.</span>}
                   {appointment.status === 'confirmed' && <span className="appointment-row__status-note">Запись подтверждена.</span>}
                   {group === 'completed' && conclusion && <Link className="text-link" to={`/patient/results#${conclusion.id}`}>Смотреть заключение</Link>}
+=======
+                  {appointment.rescheduledFrom && <span className="muted small">Перенесено с {formatDate(appointment.rescheduledFrom)} {formatTime(appointment.rescheduledFrom)}</span>}
+                  {appointment.status === 'cancelled' && appointment.cancelledBy === 'admin' && <span className="muted small">Клиника отменила запись: {appointment.cancellationReason || 'причина не указана'}</span>}
+>>>>>>> 7e5a21ecb13007ff19a3850a9bba50a2107e8166
                   <span className="appointment-row__chips">
                     {appointment.ticketNumber && <span><Ticket size={13} aria-hidden="true" />{appointment.ticketNumber}</span>}
                     {doctor?.room && <span><DoorOpen size={13} aria-hidden="true" />каб. {doctor.room}</span>}
@@ -90,6 +97,7 @@ export function PatientAppointments({ patient }: { patient: ReturnType<typeof us
                 </div>
                 <div className="appointment-row__side">
                   <StatusPill status={appointment.status} />
+                  {appointment.status === 'cancelled' && appointment.cancelledBy === 'admin' && <Link className="text-link" to="/patient/appointments/new">Записаться снова</Link>}
                   {canCancel && confirmingId !== appointment.id && (
                     <Button variant="secondary" className="button--compact" onClick={() => { setConfirmingId(appointment.id); setMessage(null) }}>Отменить</Button>
                   )}

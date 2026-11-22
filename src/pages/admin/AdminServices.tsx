@@ -7,7 +7,7 @@ import { EmptyState, Panel } from '../cabinet/CabinetLayout'
 import { errorMessage, formatPrice } from '../cabinet/format'
 import type { AdminState } from './useAdminData'
 
-const emptyService: ServiceInput = { name: '', category: '', description: '', price: 0, durationMinutes: 30, specialty: '' }
+const emptyService: ServiceInput = { name: '', category: '', description: '', price: Number.NaN, durationMinutes: 30, specialty: '' }
 
 export function AdminServices({ admin }: { admin: AdminState }) {
   const data = admin.data!
@@ -31,6 +31,14 @@ export function AdminServices({ admin }: { admin: AdminState }) {
     }
   }
 
+  async function setServiceAvailability(service: Service, active: boolean) {
+    try {
+      await updateService(service.id, { active })
+      setNotice(active ? `Услуга «${service.name}» снова доступна для записи.` : `Услуга «${service.name}» снята с записи.`)
+      await admin.reload()
+    } catch (updateError) { setError(errorMessage(updateError, 'Не удалось изменить доступность услуги.')) }
+  }
+
   return (
     <div className="admin-split">
       <Panel title={`Услуги и цены · ${data.services.length}`} action={<Button type="button" className="button--compact" onClick={() => { setEditing('new'); setNotice('') }}><Plus size={14} aria-hidden="true" />Добавить</Button>}>
@@ -41,26 +49,26 @@ export function AdminServices({ admin }: { admin: AdminState }) {
             <h3 className="detail-block__label">{category}</h3>
             <ul className="admin-cards">
               {data.services.filter((service) => service.category === category).map((service) => (
-                <li key={service.id} className="admin-card">
+                <li key={service.id} className={`admin-card ${service.active === false ? 'admin-card--muted' : ''}`}>
                   <div className="admin-card__head">
                     <span className="admin-card__title">
                       <strong>{service.name}</strong>
-                      <small className="muted">{service.durationMinutes} мин · {service.specialty ?? 'любой врач'}</small>
+                      <small className="muted">{service.active === false ? 'Снята с записи · ' : ''}{service.durationMinutes} мин · {service.specialty ?? 'любой врач'}</small>
                     </span>
                     <PriceEditor service={service} onSaved={async (message) => { setNotice(message); await admin.reload() }} onError={setError} />
                   </div>
                   {confirmDelete === service.id ? (
                     <div className="confirm-box">
-                      <p>Удалить услугу «{service.name}»? Пациенты больше не смогут на неё записаться.</p>
+          <p>Снять услугу «{service.name}» с записи? История приёмов сохранится.</p>
                       <div className="row-actions">
-                        <Button type="button" className="button--compact button--danger" onClick={() => void remove(service)}>Да, удалить</Button>
+            <Button type="button" className="button--compact button--danger" onClick={() => void remove(service)}>Да, снять с записи</Button>
                         <Button type="button" variant="secondary" className="button--compact" onClick={() => setConfirmDelete('')}>Отмена</Button>
                       </div>
                     </div>
                   ) : (
                     <div className="row-actions">
                       <Button type="button" variant="secondary" className="button--compact" onClick={() => { setEditing(service); setNotice('') }}><Pencil size={14} aria-hidden="true" />Изменить</Button>
-                      <Button type="button" variant="quiet" className="button--compact" onClick={() => { setConfirmDelete(service.id); setError('') }}><Trash2 size={14} aria-hidden="true" />Удалить</Button>
+                      {service.active === false ? <Button type="button" variant="secondary" className="button--compact" onClick={() => void setServiceAvailability(service, true)}>Вернуть в запись</Button> : <Button type="button" variant="quiet" className="button--compact" onClick={() => { setConfirmDelete(service.id); setError('') }}><Trash2 size={14} aria-hidden="true" />Снять с записи</Button>}
                     </div>
                   )}
                 </li>
@@ -88,11 +96,12 @@ export function AdminServices({ admin }: { admin: AdminState }) {
 function PriceEditor({ service, onSaved, onError }: { service: Service; onSaved: (message: string) => Promise<void>; onError: (message: string) => void }) {
   const [value, setValue] = useState(String(service.price))
   const [saving, setSaving] = useState(false)
-  const changed = Number(value) !== service.price
+  const changed = value.trim() === '' || Number(value) !== service.price
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!changed) return
+    if (!value.trim()) { onError('Укажите цену.'); return }
     setSaving(true)
     try {
       await updateService(service.id, { price: Number(value) })
@@ -160,7 +169,7 @@ function ServiceForm({ service, categories, specialties, onClose, onSaved }: {
           </select>
         </label>
         <div className="admin-filters admin-filters--two">
-          <label className="form-field cabinet-field"><span>Цена, ₸</span><input type="number" inputMode="numeric" min={0} step={500} value={form.price} onChange={(event) => set('price', Number(event.target.value))} /></label>
+          <label className="form-field cabinet-field"><span>Цена, ₸</span><input type="number" inputMode="numeric" min={0} step={500} value={Number.isFinite(form.price) ? form.price : ''} onChange={(event) => set('price', event.target.value === '' ? Number.NaN : Number(event.target.value))} /></label>
           <label className="form-field cabinet-field"><span>Длительность, мин</span><input type="number" inputMode="numeric" min={5} max={240} step={5} value={form.durationMinutes} onChange={(event) => set('durationMinutes', Number(event.target.value))} /></label>
         </div>
         <label className="form-field cabinet-field"><span>Описание</span><textarea rows={3} value={form.description} onChange={(event) => set('description', event.target.value)} /></label>

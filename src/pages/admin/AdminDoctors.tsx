@@ -1,9 +1,10 @@
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { createDoctor, deleteDoctor, updateDoctor } from '../../api'
-import { describeHours } from '../../api/schedule'
+import { Link } from 'react-router-dom'
+import { createDoctor, deleteDoctor, getScheduleConflictsFor, updateDoctor } from '../../api'
+import { defaultWorkingHours, describeHours } from '../../api/schedule'
 import { Button } from '../../components/ui'
-import type { Doctor, DoctorInput } from '../../types'
+import type { Appointment, Doctor, DoctorInput } from '../../types'
 import { EmptyState, Panel } from '../cabinet/CabinetLayout'
 import { errorMessage, isScheduled } from '../cabinet/format'
 import type { AdminState } from './useAdminData'
@@ -16,6 +17,8 @@ export function AdminDoctors({ admin }: { admin: AdminState }) {
   const [confirmDelete, setConfirmDelete] = useState('')
   const [notice, setNotice] = useState('')
   const [error, setError] = useState('')
+  const [closingId, setClosingId] = useState('')
+  const [closeConflicts, setCloseConflicts] = useState<Appointment[]>([])
   const specialties = [...new Set(data.doctors.map((doctor) => doctor.specialty))].sort()
 
   async function remove(doctor: Doctor) {
@@ -34,12 +37,29 @@ export function AdminDoctors({ admin }: { admin: AdminState }) {
   async function toggleActive(doctor: Doctor) {
     setError('')
     try {
+      if (doctor.active !== false) {
+        const affected = await getScheduleConflictsFor(doctor.id, { workingHours: doctor.workingHours ?? defaultWorkingHours(), absences: doctor.absences ?? [], scheduleOverrides: doctor.scheduleOverrides, active: false })
+        if (affected.length) { setClosingId(doctor.id); setCloseConflicts(affected); return }
+      }
       await updateDoctor(doctor.id, { active: doctor.active === false })
+      setClosingId('')
+      setCloseConflicts([])
       setNotice(doctor.active === false ? `${doctor.name} снова принимает пациентов.` : `Запись к врачу ${doctor.name} закрыта.`)
       await admin.reload()
     } catch (toggleError) {
       setError(errorMessage(toggleError, 'Не удалось изменить статус врача.'))
     }
+  }
+
+  async function confirmClose(doctor: Doctor) {
+    try {
+      const affected = await getScheduleConflictsFor(doctor.id, { workingHours: doctor.workingHours ?? defaultWorkingHours(), absences: doctor.absences ?? [], scheduleOverrides: doctor.scheduleOverrides, active: false })
+      if (affected.length) { setCloseConflicts(affected); setError('Сначала перенесите или отмените затронутые приёмы.'); return }
+      await updateDoctor(doctor.id, { active: false })
+      setClosingId(''); setCloseConflicts([])
+      setNotice(`Запись к врачу ${doctor.name} закрыта.`)
+      await admin.reload()
+    } catch (closeError) { setError(errorMessage(closeError, 'Не удалось закрыть запись.')) }
   }
 
   return (
@@ -62,6 +82,13 @@ export function AdminDoctors({ admin }: { admin: AdminState }) {
                     <span className={`admin-badge ${doctor.active === false ? 'admin-badge--off' : ''}`}>{doctor.active === false ? 'Не принимает' : 'Принимает'}</span>
                   </div>
                   <p className="muted small admin-card__meta">{describeHours(doctor.workingHours)} · запланировано приёмов: {planned}</p>
+                  {closingId === doctor.id && (
+                    <div className="confirm-box">
+                      <p>Закрытие записи затронет {closeConflicts.length} приёмов:</p>
+                      <ul>{closeConflicts.map((item) => <li key={item.id}>{new Date(item.startsAt).toLocaleString('ru-RU')} · {admin.patientOf(item.patientId)?.name ?? 'Пациент'} · <Link target="_blank" rel="noreferrer" to={`/admin/appointments?appointment=${item.id}&action=reschedule&excludeDoctor=1`}>Перенести</Link> · <Link target="_blank" rel="noreferrer" to={`/admin/appointments?appointment=${item.id}&action=cancel`}>Отменить с причиной</Link></li>)}</ul>
+                      <div className="row-actions"><Button type="button" className="button--compact" onClick={() => void confirmClose(doctor)}>Закрыть запись</Button><Button type="button" variant="secondary" className="button--compact" onClick={() => { setClosingId(''); setCloseConflicts([]) }}>Оставить</Button></div>
+                    </div>
+                  )}
                   {confirmDelete === doctor.id ? (
                     <div className="confirm-box">
                       <p>Удалить врача {doctor.name}? Это действие нельзя отменить.</p>
@@ -73,6 +100,7 @@ export function AdminDoctors({ admin }: { admin: AdminState }) {
                   ) : (
                     <div className="row-actions">
                       <Button type="button" variant="secondary" className="button--compact" onClick={() => { setEditing(doctor); setNotice('') }}><Pencil size={14} aria-hidden="true" />Изменить</Button>
+                      <Link className="button button--secondary button--compact" to={`/admin/schedule?doctor=${encodeURIComponent(doctor.id)}`}>Расписание</Link>
                       <Button type="button" variant="secondary" className="button--compact" onClick={() => void toggleActive(doctor)}>{doctor.active === false ? 'Открыть запись' : 'Закрыть запись'}</Button>
                       <Button type="button" variant="quiet" className="button--compact" onClick={() => { setConfirmDelete(doctor.id); setError('') }}><Trash2 size={14} aria-hidden="true" />Удалить</Button>
                     </div>
@@ -126,8 +154,10 @@ function DoctorForm({ doctor, specialties, onClose, onSaved }: { doctor: Doctor 
         <label className="form-field cabinet-field"><span>Имя и фамилия</span><input value={form.name} onChange={(event) => set('name', event.target.value)} autoComplete="off" required /></label>
         <label className="form-field cabinet-field">
           <span>Специальность</span>
-          <input value={form.specialty} list="admin-specialties" onChange={(event) => set('specialty', event.target.value)} required />
-          <datalist id="admin-specialties">{specialties.map((item) => <option key={item} value={item} />)}</datalist>
+          <select value={form.specialty} onChange={(event) => set('specialty', event.target.value)} required>
+            <option value="">Выберите специальность</option>
+            {specialties.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
         </label>
         <div className="admin-filters admin-filters--two">
           <label className="form-field cabinet-field"><span>Стаж, лет</span><input type="number" inputMode="numeric" min={0} max={70} value={form.experienceYears} onChange={(event) => set('experienceYears', Number(event.target.value))} /></label>
