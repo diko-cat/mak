@@ -87,8 +87,13 @@ export interface Appointment {
   patientId: string
   doctorId: string
   serviceId: string
+  /** Название услуги и стоимость на момент записи; сохраняются при изменении прайса или услуги. */
+  serviceName?: string
+  price?: number
   startsAt: string
   status: AppointmentStatus
+  /** Когда администратор подтвердил заявку. */
+  confirmedAt?: string
   /** Причина обращения. */
   note?: string
   /** Номер талона, выдаётся при записи. */

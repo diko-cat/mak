@@ -52,11 +52,7 @@ export function BookingCalendar({
   const lastMonth = startOfMonth(maxDate)
   const minKey = toDateKey(minDate)
   const maxKey = toDateKey(maxDate)
-  const hasAvailableDates = dates.some((day) => {
-    if (!day) return false
-    const key = toDateKey(day)
-    return key >= minKey && key <= maxKey && (availability[key] ?? 0) > 0
-  })
+  const hasAvailableDates = Object.entries(availability).some(([key, count]) => key >= minKey && key <= maxKey && count > 0)
 
   return (
     <div className="booking-calendar" role="group" aria-label="Свободные даты">

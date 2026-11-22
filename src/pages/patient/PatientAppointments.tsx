@@ -65,6 +65,9 @@ export function PatientAppointments({ patient }: { patient: ReturnType<typeof us
           {byGroup[group].map((appointment) => {
             const doctor = doctorOf(appointment.doctorId)
             const service = serviceOf(appointment.serviceId)
+            const serviceName = appointment.serviceName ?? service?.name ?? 'Услуга недоступна'
+            const price = appointment.price ?? service?.price
+            const conclusion = data.conclusions.find((entry) => entry.appointmentId === appointment.id)
             const canCancel = isScheduled(appointment) && new Date(appointment.startsAt).getTime() > Date.now()
             return (
               <li key={appointment.id} className="appointment-row">
@@ -73,13 +76,16 @@ export function PatientAppointments({ patient }: { patient: ReturnType<typeof us
                   <span><Clock3 size={13} aria-hidden="true" />{formatTime(appointment.startsAt)}</span>
                 </div>
                 <div className="appointment-row__body">
-                  <strong>{service?.name}</strong>
-                  <span>{doctor?.name} · {doctor?.specialty}</span>
+                  <strong>{serviceName}</strong>
+                  <span>{doctor?.name ?? 'Врач'}{doctor?.specialty ? ` · ${doctor.specialty}` : ''}</span>
                   {appointment.note && <span className="muted">Причина: {appointment.note}</span>}
+                  {appointment.status === 'requested' && <span className="appointment-row__status-note">Администратор подтвердит заявку и позвонит вам.</span>}
+                  {appointment.status === 'confirmed' && <span className="appointment-row__status-note">Запись подтверждена.</span>}
+                  {group === 'completed' && conclusion && <Link className="text-link" to={`/patient/results#${conclusion.id}`}>Смотреть заключение</Link>}
                   <span className="appointment-row__chips">
                     {appointment.ticketNumber && <span><Ticket size={13} aria-hidden="true" />{appointment.ticketNumber}</span>}
                     {doctor?.room && <span><DoorOpen size={13} aria-hidden="true" />каб. {doctor.room}</span>}
-                    {service && <span>{formatPrice(service.price)}</span>}
+                    {price !== undefined && <span>{formatPrice(price)}</span>}
                   </span>
                 </div>
                 <div className="appointment-row__side">
@@ -90,7 +96,7 @@ export function PatientAppointments({ patient }: { patient: ReturnType<typeof us
                 </div>
                 {confirmingId === appointment.id && (
                   <div className="confirm-box" role="alertdialog" aria-label="Подтверждение отмены">
-                    <p>Отменить запись на {formatDate(appointment.startsAt)} в {formatTime(appointment.startsAt)}? Это действие нельзя отменить.</p>
+                    <p>Отменить запись на {formatDate(appointment.startsAt)} в {formatTime(appointment.startsAt)}? Время освободится. Если передумаете, запишитесь снова.</p>
                     <div className="row-actions">
                       <Button className="button--danger button--compact" disabled={busyId === appointment.id} onClick={() => cancel(appointment.id)}>{busyId === appointment.id ? 'Отменяем…' : 'Да, отменить'}</Button>
                       <Button variant="secondary" className="button--compact" onClick={() => setConfirmingId('')}>Оставить запись</Button>

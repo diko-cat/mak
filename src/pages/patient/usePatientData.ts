@@ -41,5 +41,5 @@ export function usePatientData(patientId: string | undefined) {
   const doctorOf = (id: string) => data?.doctors.find((doctor) => doctor.id === id)
   const serviceOf = (id: string) => data?.services.find((service) => service.id === id)
 
-  return { data, error, reload, doctorOf, serviceOf }
+  return { patientId, data, error, reload, doctorOf, serviceOf }
 }

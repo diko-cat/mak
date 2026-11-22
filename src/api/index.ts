@@ -97,6 +97,24 @@ export async function getAppointments(filters: AppointmentFilters = {}): Promise
     .sort((left, right) => left.startsAt.localeCompare(right.startsAt))
 }
 
+function appointmentOverlaps(
+  appointment: Appointment,
+  database: MockDatabase,
+  startsAt: Date,
+  durationMinutes: number,
+  ignoreId?: string,
+): boolean {
+  if (appointment.id === ignoreId) return false
+  if (!isActiveStatus(appointment.status)) return false
+  const existingService = database.services.find((service) => service.id === appointment.serviceId)
+  const existingDuration = existingService?.durationMinutes ?? 30
+  const existingStart = new Date(appointment.startsAt).getTime()
+  const existingEnd = existingStart + existingDuration * 60_000
+  const newStart = startsAt.getTime()
+  const newEnd = newStart + durationMinutes * 60_000
+  return newStart < existingEnd && existingStart < newEnd
+}
+
 function appointmentConflicts(
   appointment: Appointment,
   database: MockDatabase,
@@ -105,15 +123,17 @@ function appointmentConflicts(
   durationMinutes: number,
   ignoreId?: string,
 ): boolean {
-  if (appointment.id === ignoreId) return false
-  if (appointment.doctorId !== doctorId || !isActiveStatus(appointment.status)) return false
-  const existingService = database.services.find((service) => service.id === appointment.serviceId)
-  const existingDuration = existingService?.durationMinutes ?? 30
-  const existingStart = new Date(appointment.startsAt).getTime()
-  const existingEnd = existingStart + existingDuration * 60_000
-  const newStart = startsAt.getTime()
-  const newEnd = newStart + durationMinutes * 60_000
-  return newStart < existingEnd && existingStart < newEnd
+  return appointment.doctorId === doctorId && appointmentOverlaps(appointment, database, startsAt, durationMinutes, ignoreId)
+}
+
+function patientAppointmentConflict(
+  appointment: Appointment,
+  database: MockDatabase,
+  patientId: string,
+  startsAt: Date,
+  durationMinutes: number,
+): boolean {
+  return appointment.patientId === patientId && appointmentOverlaps(appointment, database, startsAt, durationMinutes)
 }
 
 /**
@@ -126,6 +146,7 @@ export async function getDaySlots(
   date: string,
   durationMinutes = 30,
   ignoreAppointmentId?: string,
+  patientId?: string,
 ): Promise<DaySlot[]> {
   const database = readDatabase()
   const doctor = database.doctors.find((entry) => entry.id === doctorId)
@@ -141,7 +162,8 @@ export async function getDaySlots(
     start.setMinutes(minutes)
     const startsAt = start.toISOString()
     if (start.getTime() <= Date.now()) slots.push({ startsAt, available: false, reason: 'past' })
-    else if (database.appointments.some((appointment) => appointmentConflicts(appointment, database, doctorId, start, durationMinutes, ignoreAppointmentId))) slots.push({ startsAt, available: false, reason: 'busy' })
+    else if (database.appointments.some((appointment) => appointmentConflicts(appointment, database, doctorId, start, durationMinutes, ignoreAppointmentId)
+      || Boolean(patientId && patientAppointmentConflict(appointment, database, patientId, start, durationMinutes)))) slots.push({ startsAt, available: false, reason: 'busy' })
     else slots.push({ startsAt, available: true })
   }
   return slots
@@ -152,11 +174,12 @@ export async function getCalendarAvailability(
   doctorId: string,
   dates: string[],
   durationMinutes = 30,
+  patientId?: string,
 ): Promise<Record<string, number>> {
   const doctor = readDatabase().doctors.find((entry) => entry.id === doctorId)
   if (!doctor) throw new ApiError('Выбранный врач не найден.', 'DOCTOR_NOT_FOUND')
   const availability = await Promise.all(dates.map(async (date) => {
-    const slots = await getDaySlots(doctorId, date, durationMinutes)
+    const slots = await getDaySlots(doctorId, date, durationMinutes, undefined, patientId)
     return [date, slots.filter((slot) => slot.available).length] as const
   }))
   return Object.fromEntries(availability)
@@ -183,18 +206,32 @@ export async function createAppointment(input: CreateAppointmentInput): Promise<
   if (!doctor) throw new ApiError('Выбранный врач не найден.', 'DOCTOR_NOT_FOUND')
   if (!patient) throw new ApiError('Пациент не найден.', 'PATIENT_NOT_FOUND')
   if (!service) throw new ApiError('Выбранная услуга не найдена.', 'SERVICE_NOT_FOUND')
+  const note = input.note?.trim() ?? ''
+  if (!note) throw new ApiError('Укажите причину обращения.', 'VALIDATION_ERROR')
   if (doctor.active === false) throw new ApiError('Этот врач сейчас не принимает. Выберите другого специалиста.', 'DOCTOR_INACTIVE')
   if (service.specialty && service.specialty !== doctor.specialty) throw new ApiError('Эту услугу оказывает врач другой специальности.', 'DOCTOR_SPECIALTY_MISMATCH')
   if (Number.isNaN(startsAt.getTime())) throw new ApiError('Выберите корректную дату и время.', 'INVALID_APPOINTMENT_TIME')
   if (startsAt.getTime() <= Date.now()) throw new ApiError('Нельзя записаться на прошедшее время.', 'PAST_APPOINTMENT')
   if (!fitsWorkingHours(doctor, startsAt, service.durationMinutes)) throw new ApiError('Врач не принимает в это время.', 'OUTSIDE_WORKING_HOURS')
+  const patientConflict = database.appointments
+    .filter((appointment) => patientAppointmentConflict(appointment, database, patient.id, startsAt, service.durationMinutes))
+    .sort((left, right) => left.startsAt.localeCompare(right.startsAt))[0]
+  if (patientConflict) {
+    const conflictStartsAt = new Date(patientConflict.startsAt)
+    const conflictDate = new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit' }).format(conflictStartsAt)
+    const conflictTime = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(conflictStartsAt)
+    throw new ApiError(`У вас уже есть запись на ${conflictDate} в ${conflictTime}. Выберите другое время`, 'PATIENT_APPOINTMENT_CONFLICT')
+  }
   if (database.appointments.some((appointment) => appointmentConflicts(appointment, database, doctor.id, startsAt, service.durationMinutes))) {
     throw new ApiError('Это время уже занято. Выберите другой слот.', 'SLOT_TAKEN')
   }
 
   const appointment: Appointment = {
     ...input,
-    note: input.note?.trim() || undefined,
+    startsAt: startsAt.toISOString(),
+    serviceName: service.name,
+    price: service.price,
+    note,
     id: createId('appointment'),
     status: 'requested',
     ticketNumber: nextTicketNumber(database),
@@ -226,6 +263,7 @@ export async function updateAppointmentStatus(id: string, status: AppointmentSta
   if (status === 'confirmed') {
     requirePermission('appointments:confirm')
     if (appointment.status !== 'requested') throw new ApiError('Подтвердить можно только запись, ожидающую подтверждения.', 'INVALID_STATUS_TRANSITION')
+    appointment.confirmedAt = new Date().toISOString()
   } else if (status === 'cancelled') {
     const ownRecord = user?.role === 'patient' && user.patientId === appointment.patientId
     if (!hasPermission(user, 'appointments:cancel-any') && !(ownRecord && hasPermission(user, 'appointments:cancel-own'))) {

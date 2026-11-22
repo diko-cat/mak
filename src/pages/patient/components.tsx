@@ -1,9 +1,14 @@
 import { AlertTriangle, ArrowDown, ArrowUp, FileText } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { buttonStyles } from '../../components/ui'
 import type { Appointment, Doctor, LabTest, MedicalConclusion, Service } from '../../types'
-import { formatDate, formatTime, indicatorState, longDayFormat } from '../cabinet/format'
+import { formatDate, formatPrice, formatTime, indicatorState, longDayFormat } from '../cabinet/format'
 
 export function AppointmentTicket({ appointment, doctor, service }: { appointment: Appointment; doctor?: Doctor; service?: Service }) {
   const starts = new Date(appointment.startsAt)
+  const serviceName = appointment.serviceName ?? service?.name ?? 'Услуга'
+  const price = appointment.price ?? service?.price
+
   return (
     <article className="ticket" aria-label={`Талон ${appointment.ticketNumber ?? ''}`}>
       <div className="ticket__main">
@@ -12,7 +17,8 @@ export function AppointmentTicket({ appointment, doctor, service }: { appointmen
         <div className="ticket__grid">
           <div><p className="ticket__label">Время</p><p className="ticket__value">{formatTime(appointment.startsAt)}</p></div>
           <div><p className="ticket__label">Кабинет</p><p className="ticket__value">{doctor?.room ?? '—'}</p></div>
-          <div className="ticket__wide"><p className="ticket__label">Специалист</p><p className="ticket__value">{doctor?.name ?? 'Специалист клиники'}</p><p className="ticket__hint">{doctor?.specialty}{service ? ` · ${service.name}` : ''}</p></div>
+          <div className="ticket__wide"><p className="ticket__label">Специалист</p><p className="ticket__value">{doctor?.name ?? 'Специалист клиники'}</p><p className="ticket__hint">{doctor?.specialty ? `${doctor.specialty} · ` : ''}{serviceName}</p></div>
+          <div><p className="ticket__label">Стоимость</p><p className="ticket__value">{price !== undefined ? formatPrice(price) : '—'}</p></div>
         </div>
       </div>
       <div className="ticket__stub">
@@ -24,12 +30,26 @@ export function AppointmentTicket({ appointment, doctor, service }: { appointmen
   )
 }
 
-export function ConclusionCard({ conclusion, doctor }: { conclusion: MedicalConclusion; doctor?: Doctor }) {
+export function ConclusionCard({ conclusion, doctor, appointment, service }: { conclusion: MedicalConclusion; doctor?: Doctor; appointment?: Appointment; service?: Service }) {
+  const bookingParams = new URLSearchParams({ doctor: conclusion.doctorId })
+  const serviceId = appointment?.serviceId ?? service?.id
+  if (serviceId) bookingParams.set('service', serviceId)
+
   return (
     <article className="conclusion">
-      <div className="conclusion__meta"><FileText size={15} aria-hidden="true" /><span>{formatDate(conclusion.createdAt)}</span>{doctor && <span>· {doctor.name}, {doctor.specialty.toLowerCase()}</span>}</div>
+      <div className="conclusion__meta">
+        <FileText size={15} aria-hidden="true" />
+        <span>{formatDate(appointment?.startsAt ?? conclusion.createdAt)}</span>
+        <span>{appointment?.serviceName ?? service?.name ?? 'Услуга не указана'}</span>
+        <span>{doctor?.name ?? 'Врач не указан'}</span>
+        <span>каб. {doctor?.room ?? '—'}</span>
+      </div>
+      <p className="detail-block__label">Заключение</p>
       <h3>{conclusion.diagnosis}</h3>
-      {conclusion.recommendations && <p><strong>Назначения:</strong> {conclusion.recommendations}</p>}
+      <p><strong>Назначения:</strong> {conclusion.recommendations || '—'}</p>
+      <div className="row-actions conclusion__actions">
+        <Link className={buttonStyles('secondary', 'button--compact')} to={`/patient/appointments/new?${bookingParams.toString()}`}>Записаться на повторный приём</Link>
+      </div>
     </article>
   )
 }
@@ -40,15 +60,23 @@ export function hasDeviations(test: LabTest): boolean {
   return Boolean(test.indicators?.some((indicator) => indicatorState(indicator) !== 'normal'))
 }
 
-export function LabTestCard({ test, onlyDeviations = false }: { test: LabTest; onlyDeviations?: boolean }) {
+export function LabTestCard({ test, doctor, onlyDeviations = false }: { test: LabTest; doctor?: Doctor; onlyDeviations?: boolean }) {
   const indicators = (test.indicators ?? []).filter((indicator) => !onlyDeviations || indicatorState(indicator) !== 'normal')
+  const deviates = hasDeviations(test)
+
   return (
     <article className="lab">
       <div className="lab__head">
         <h3>{test.name}</h3>
         <span className={`lab__status lab__status--${test.status}`}>{labStatus[test.status]}</span>
       </div>
-      <p className="lab__meta">{test.resultAt ? `Результат от ${formatDate(test.resultAt)}` : `Назначен ${formatDate(test.orderedAt)}`}</p>
+      <p className="lab__meta">
+        {test.status === 'ordered' ? `Назначен ${formatDate(test.orderedAt)}` : test.status === 'in-progress' ? `В работе с ${formatDate(test.orderedAt)}` : `Результат от ${formatDate(test.resultAt ?? test.orderedAt)}`}
+        {doctor && <> · Назначил: {doctor.name}</>}
+      </p>
+      {test.status === 'ordered' && <p className="lab__instruction">Сдайте анализ в лаборатории клиники до следующего приёма. Время забора и подготовку уточните у администратора.</p>}
+      {test.status === 'in-progress' && <p className="lab__result lab__result--pending">Анализ выполняется. Результат появится в кабинете после готовности.</p>}
+      {test.result && <p className="lab__result"><strong>Итог:</strong> {test.result}</p>}
       {indicators.length > 0 ? (
         <table className="lab__table">
           <thead><tr><th scope="col">Показатель</th><th scope="col">Значение</th><th scope="col">Норма</th></tr></thead>
@@ -71,8 +99,11 @@ export function LabTestCard({ test, onlyDeviations = false }: { test: LabTest; o
             })}
           </tbody>
         </table>
-      ) : test.result ? <p className="lab__result">{test.result}</p> : <p className="lab__result lab__result--pending">Результат ещё не готов.</p>}
-      {!onlyDeviations && hasDeviations(test) && <p className="lab__warning"><AlertTriangle size={14} aria-hidden="true" />Есть значения вне нормы — обсудите их с врачом.</p>}
+      ) : test.status === 'ready' && !test.result ? (
+        <p className="lab__result">Анализ готов. Обратитесь к врачу, назначившему исследование, чтобы получить и обсудить результат.</p>
+      ) : null}
+      {!onlyDeviations && deviates && <p className="lab__warning"><AlertTriangle size={14} aria-hidden="true" />Есть значения вне нормы — обсудите их с врачом.</p>}
+      {deviates && doctor && <div className="row-actions lab__actions"><Link className={buttonStyles('secondary', 'button--compact')} to={`/patient/appointments/new?doctor=${encodeURIComponent(doctor.id)}`}>Записаться к врачу, назначившему анализ</Link></div>}
     </article>
   )
 }
