@@ -352,8 +352,8 @@
 
 /* Запись к врачу — мастер по шагам */
 .booking-wizard { display: grid; gap: 14px; max-width: 920px; }
-.booking-wizard--forward > .panel { animation: booking-in-forward .38s cubic-bezier(.22, 1, .36, 1); }
-.booking-wizard--back > .panel { animation: booking-in-back .38s cubic-bezier(.22, 1, .36, 1); }
+.booking-wizard--forward > .booking-wizard__step { animation: booking-in-forward .38s cubic-bezier(.22, 1, .36, 1); }
+.booking-wizard--back > .booking-wizard__step { animation: booking-in-back .38s cubic-bezier(.22, 1, .36, 1); }
 @keyframes booking-in-forward { from { opacity: 0; transform: translateX(28px); } }
 @keyframes booking-in-back { from { opacity: 0; transform: translateX(-28px); } }
 .booking-wizard .choice-grid > *, .booking-wizard .slot-grid > * { animation: booking-pop .35s cubic-bezier(.22, 1, .36, 1) backwards; }
@@ -408,3 +408,4 @@
 }
 
 .lab .conclusion__meta { margin-bottom: 8px; }
+.booking-wizard__step { scroll-margin-top: 100px; }
