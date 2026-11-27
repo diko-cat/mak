@@ -229,8 +229,14 @@
 .schedule-item--cancelled { opacity: .6; }
 .doctor-calendar-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 10px; }
 .doctor-calendar-tools__date input { min-height: 40px; padding: 0 8px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--surface); }
+.doctor-calendar-tools__date input:focus-visible { border-color: var(--green); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--green-soft) 76%, transparent); }
 .doctor-working-hours { margin: 0 0 8px; }
 .doctor-working-hours strong { color: var(--ink-strong); }
+.doctor-arrival { display: grid; gap: 7px; margin: 0 0 12px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-alt); }
+.doctor-arrival__saved { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--green); font-size: 13px; }
+.doctor-arrival__saved strong { color: var(--ink-strong); }
+.doctor-arrival .form-message { margin: 0; }
+.doctor-schedule-notice { margin: 0 0 12px; padding: 10px 12px; border-radius: 8px; color: var(--green); background: var(--green-soft); }
 .doctor-unclosed { display: flex; width: 100%; align-items: center; gap: 5px; margin: 0 0 12px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: var(--surface-alt); text-align: left; cursor: pointer; }
 .doctor-unclosed strong { color: var(--green); }
 .doctor-unclosed span { margin-left: auto; color: var(--green); font-size: 12px; font-weight: 650; }
@@ -242,6 +248,17 @@
 .doctor-lab-row { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--page); }
 .doctor-lab-row .form-field { margin: 0; }
 .doctor-lab-row p { margin: 0; font-size: 13px; }
+.doctor-appointment-actions { display: grid; gap: 10px; margin: 12px 0; padding: 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-alt); }
+.doctor-appointment-actions__title { margin: 0; color: var(--ink-strong); font-size: 13px; font-weight: 700; }
+.doctor-action-form { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--page); }
+.doctor-action-form .cabinet-field { margin: 0; }
+.doctor-action-form .form-message { margin: 0; }
+.doctor-reschedule { display: grid; gap: 12px; padding: 14px; border: 1px solid color-mix(in srgb, var(--green) 35%, var(--line)); border-radius: 9px; background: var(--page); }
+.doctor-reschedule h4 { margin: 0; color: var(--ink-strong); font-size: 14px; }
+.doctor-reschedule .booking-calendar { max-width: 420px; }
+.doctor-reschedule__slots { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 9px; }
+.doctor-reschedule__slots legend { padding: 0 5px; color: var(--ink-strong); font-size: 12px; font-weight: 700; }
+.doctor-reschedule__foot { justify-content: flex-end; }
 .schedule-item__time { display: inline-flex; align-items: center; gap: 4px; color: var(--green); font-size: 14px; font-weight: 750; }
 .schedule-item__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .schedule-item__body strong { font-size: 13px; }

@@ -31,7 +31,7 @@ export function DoctorCabinet() {
     <CabinetLayout eyebrow="КАБИНЕТ ВРАЧА" title={user?.name ?? 'Врач'} subtitle={subtitle} tabs={tabs}>
       {doctor.error ? <p className="form-message form-message--error" role="alert">{doctor.error}</p> : (
         <Routes>
-          <Route index element={<DoctorSchedule doctor={doctor} profile={profile ?? undefined} />} />
+          <Route index element={<DoctorSchedule doctor={doctor} profile={profile ?? undefined} doctorId={doctorId} />} />
           <Route path="patients" element={<DoctorPatients doctor={doctor} />} />
           <Route path="*" element={<Navigate to="/doctor" replace />} />
         </Routes>
