@@ -1,5 +1,5 @@
 ﻿import { CalendarClock, ClipboardList, KeyRound, LayoutDashboard, Stethoscope, Tags } from 'lucide-react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Link, Route, Routes } from 'react-router-dom'
 import { hasPermission } from '../../auth/permissions'
 import { Button } from '../../components/ui'
 import { useSession } from '../../store/session'
@@ -38,6 +38,7 @@ export function AdminPage() {
         </div>
       ) : (
         <>
+        <p className="muted small">Демо-режим: данные хранятся в этом браузере и не синхронизируются между устройствами. Формы и уведомления не отправляются в клинику; демо-роли не заменяют настоящую защиту доступа.</p>
         {admin.loading && <p className="muted small" role="status">Обновляем данные…</p>}
         {admin.error && <div className="admin-load-error" role="alert"><p className="form-message form-message--error">{admin.error} Показаны последние загруженные данные.</p><Button type="button" variant="secondary" className="button--compact" onClick={() => void admin.reload()}>Повторить</Button></div>}
         <Routes>
@@ -47,7 +48,7 @@ export function AdminPage() {
           {allowed('schedule:manage') && <Route path="schedule" element={<AdminSchedule admin={admin} />} />}
           {allowed('services:manage') && <Route path="services" element={<AdminServices admin={admin} />} />}
           <Route path="access" element={<AdminAccess onReset={admin.reload} />} />
-          <Route path="*" element={<Navigate to="/admin" replace />} />
+          <Route path="*" element={<section className="not-found"><div className="container"><p className="eyebrow">СТРАНИЦА НЕ НАЙДЕНА</p><h2>Раздел кабинета администратора не найден.</h2><Link className="button button--primary" to="/admin">К обзору</Link></div></section>} />
         </Routes>
         </>
       )}

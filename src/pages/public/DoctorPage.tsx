@@ -95,7 +95,7 @@ export function DoctorPage() {
               <h2>Ближайшее свободное время</h2>
               {error && <p className="form-message form-message--error" role="alert">{error}</p>}
               {!error && slots === null && <p className="loading-note">Ищем свободное время…</p>}
-              {slots?.length === 0 && <p>В ближайшие {SEARCH_DAYS} дней свободного времени нет. Оставьте заявку на звонок — администратор подберёт время.</p>}
+              {slots?.length === 0 && <p>В ближайшие {SEARCH_DAYS} дней свободного времени нет. На странице <Link to="/contacts">Контакты</Link> можно сохранить демо-заявку на обратный звонок; клиника её не получит.</p>}
               {slots && slots.length > 0 && (
                 <ul className="doctor-slots">
                   {slots.map((slot) => (

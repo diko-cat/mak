@@ -1,0 +1,23 @@
+{
+  "rewrites": [
+    { "source": "/about", "destination": "/index.html" },
+    { "source": "/services", "destination": "/index.html" },
+    { "source": "/doctors", "destination": "/index.html" },
+    { "source": "/doctors/:id", "destination": "/index.html" },
+    { "source": "/contacts", "destination": "/index.html" },
+    { "source": "/login", "destination": "/index.html" },
+    { "source": "/privacy", "destination": "/index.html" },
+    { "source": "/patient", "destination": "/index.html" },
+    { "source": "/patient/appointments/new", "destination": "/index.html" },
+    { "source": "/patient/appointments", "destination": "/index.html" },
+    { "source": "/patient/results", "destination": "/index.html" },
+    { "source": "/doctor", "destination": "/index.html" },
+    { "source": "/doctor/patients", "destination": "/index.html" },
+    { "source": "/admin", "destination": "/index.html" },
+    { "source": "/admin/appointments", "destination": "/index.html" },
+    { "source": "/admin/doctors", "destination": "/index.html" },
+    { "source": "/admin/schedule", "destination": "/index.html" },
+    { "source": "/admin/services", "destination": "/index.html" },
+    { "source": "/admin/access", "destination": "/index.html" }
+  ]
+}

@@ -5,8 +5,10 @@ import { updateAppointmentStatus } from '../../api'
 import { Button, buttonStyles } from '../../components/ui'
 import type { Appointment } from '../../types'
 import { EmptyState, LoadingNote, Panel, StatusPill } from '../cabinet/CabinetLayout'
-import { errorMessage, formatDate, formatPrice, formatTime, isScheduled } from '../cabinet/format'
+import { errorMessage, formatDate, formatDateTime, formatPrice, formatTime, isScheduled } from '../cabinet/format'
 import type { usePatientData } from './usePatientData'
+
+const actorLabels = { patient: 'пациент', doctor: 'врач', admin: 'администратор' } as const
 
 type Group = 'scheduled' | 'completed' | 'cancelled' | 'no-show'
 const groups: { id: Group; label: string; empty: string }[] = [
@@ -81,11 +83,16 @@ export function PatientAppointments({ patient }: { patient: ReturnType<typeof us
                   <strong>{serviceName}</strong>
                   <span>{doctor?.name ?? 'Врач'}{doctor?.specialty ? ` · ${doctor.specialty}` : ''}</span>
                   {appointment.note && <span className="muted">Причина: {appointment.note}</span>}
-                  {appointment.status === 'requested' && <span className="appointment-row__status-note">Администратор подтвердит заявку и позвонит вам.</span>}
-                  {appointment.status === 'confirmed' && <span className="appointment-row__status-note">Запись подтверждена.</span>}
+                  {appointment.status === 'requested' && <span className="appointment-row__status-note">Демо-запись ожидает подтверждения. Клиника не получила уведомление.</span>}
+                  {appointment.status === 'confirmed' && <span className="appointment-row__status-note">Запись подтверждена в демо-версии.</span>}
                   {group === 'completed' && conclusion && <Link className="text-link" to={`/patient/results#${conclusion.id}`}>Смотреть заключение</Link>}
-                  {appointment.rescheduledFrom && <span className="muted small">Перенесено с {formatDate(appointment.rescheduledFrom)} {formatTime(appointment.rescheduledFrom)}</span>}
-                  {appointment.status === 'cancelled' && appointment.cancelledBy === 'admin' && <span className="muted small">Клиника отменила запись: {appointment.cancellationReason || 'причина не указана'}</span>}
+                  {appointment.rescheduledFrom && <span className="muted small">Перенесено: {formatDate(appointment.rescheduledFrom)} {formatTime(appointment.rescheduledFrom)} → {formatDate(appointment.startsAt)} {formatTime(appointment.startsAt)}</span>}
+                  {appointment.rescheduledBy && <span className="muted small">Кто перенёс: {actorLabels[appointment.rescheduledBy]}</span>}
+                  {appointment.rescheduledAt && <span className="muted small">Время переноса: {formatDateTime(appointment.rescheduledAt)}</span>}
+                  {appointment.status === 'cancelled' && appointment.cancelledBy && <span className="muted small">Кто отменил: {actorLabels[appointment.cancelledBy]}</span>}
+                  {appointment.status === 'cancelled' && appointment.cancellationReason && <span className="muted small">Причина отмены: {appointment.cancellationReason}</span>}
+                  {appointment.status === 'no-show' && appointment.noShowMarkedBy && <span className="muted small">Неявку отметил: {actorLabels[appointment.noShowMarkedBy]}</span>}
+                  {appointment.status === 'no-show' && appointment.noShowReason && <span className="muted small">Причина неявки: {appointment.noShowReason}</span>}
                   <span className="appointment-row__chips">
                     {appointment.ticketNumber && <span><Ticket size={13} aria-hidden="true" />{appointment.ticketNumber}</span>}
                     {doctor?.room && <span><DoorOpen size={13} aria-hidden="true" />каб. {doctor.room}</span>}

@@ -4,9 +4,9 @@ import { useSearchParams } from 'react-router-dom'
 import { getCalendarAvailability, getDaySlots, rescheduleAppointment, updateAppointmentStatus, updateLabTest } from '../../api'
 import { fitsWorkingHours } from '../../api/schedule'
 import { Button } from '../../components/ui'
-import type { Appointment, AppointmentStatus, DaySlot, LabTest } from '../../types'
+import type { Appointment, AppointmentStatus, DaySlot, LabTest, Role } from '../../types'
 import { EmptyState, LoadingNote, Panel, StatusPill } from '../cabinet/CabinetLayout'
-import { errorMessage, formatDate, formatPrice, formatTime, isScheduled, toDateKey } from '../cabinet/format'
+import { errorMessage, formatDate, formatDateTime, formatPrice, formatTime, isScheduled, toDateKey } from '../cabinet/format'
 import type { AdminState } from './useAdminData'
 
 type StatusFilter = 'active' | 'requires-transfer' | 'to-mark' | AppointmentStatus | 'all'
@@ -22,6 +22,8 @@ const statusFilters: { value: StatusFilter; label: string }[] = [
   { value: 'no-show', label: 'Не явился' },
   { value: 'all', label: 'Все' },
 ]
+
+const actorLabels: Record<Role, string> = { patient: 'пациент', doctor: 'врач', admin: 'администратор' }
 
 export function AdminAppointments({ admin }: { admin: AdminState }) {
   const data = admin.data!
@@ -41,7 +43,11 @@ export function AdminAppointments({ admin }: { admin: AdminState }) {
     if (!doctor || !isScheduled(item) || new Date(item.startsAt).getTime() <= Date.now()) return false
     return doctor.active === false || !fitsWorkingHours(doctor, new Date(item.startsAt), admin.serviceOf(item.serviceId)?.durationMinutes ?? 30)
   }
-  const matchesStatus = (item: Appointment) => status === 'all' || (status === 'active' ? isScheduled(item) : status === 'to-mark' ? isPastUnmarked(item) : status === 'requires-transfer' ? needsTransfer(item) : item.status === status)
+  const matchesStatus = (item: Appointment, filter: StatusFilter) => filter === 'all'
+    || (filter === 'active' ? isScheduled(item)
+      : filter === 'to-mark' ? isPastUnmarked(item)
+        : filter === 'requires-transfer' ? needsTransfer(item)
+          : item.status === filter)
   const list = useMemo(() => data.appointments
     .filter((item) => !doctorId || item.doctorId === doctorId)
     .filter((item) => !date || toDateKey(new Date(item.startsAt)) === date)
@@ -51,8 +57,8 @@ export function AdminAppointments({ admin }: { admin: AdminState }) {
       const patient = admin.patientOf(item.patientId)
       return [patient?.name, patient?.phone, item.ticketNumber].some((value) => value?.toLowerCase().includes(needle))
     }), [data, doctorId, date, query, admin])
-  const visible = list.filter(matchesStatus)
-  const countFor = (value: StatusFilter) => list.filter((item) => value === 'all' || (value === 'active' ? isScheduled(item) : value === 'to-mark' ? isPastUnmarked(item) : value === 'requires-transfer' ? needsTransfer(item) : item.status === value)).length
+  const visible = list.filter((item) => matchesStatus(item, status))
+  const countFor = (value: StatusFilter) => list.filter((item) => matchesStatus(item, value)).length
   const selectedRows = selectedAppointment ? visible.filter((item) => item.id === selectedAppointment) : visible
 
   return (
@@ -82,6 +88,7 @@ export function AdminAppointments({ admin }: { admin: AdminState }) {
             </button>
           ))}
         </div>
+        {status === 'to-mark' && <p className="muted small">Здесь запланированные приёмы, время которых уже прошло и для которых ещё не указано завершение или неявка. Отменённые и завершённые записи не входят в список.</p>}
         {notice && <p className="form-message form-message--success" role="status">{notice}</p>}
         {selectedAppointment && selectedRows.length === 0 && <p className="form-message form-message--success" role="status">Запись обновлена или больше не требует действия. Выберите другую вкладку, чтобы увидеть весь список.</p>}
         {selectedRows.length === 0 ? <EmptyState>По выбранным условиям записей нет.</EmptyState> : (
@@ -165,10 +172,13 @@ function AppointmentItem({ appointment, admin, onDone, initialMode, excludeCurre
           {service && <span>{formatPrice(service.price)}</span>}
         </div>
           {appointment.note && <span className="muted small">Причина: {appointment.note}</span>}
-          {appointment.rescheduledFrom && <span className="muted small">Прежняя дата и время: {formatDate(appointment.rescheduledFrom)} {formatTime(appointment.rescheduledFrom)}</span>}
-          {appointment.rescheduledFrom && <span className="muted small">Перенесено на: {formatDate(appointment.startsAt)} {formatTime(appointment.startsAt)}</span>}
-          {appointment.status === 'cancelled' && appointment.cancelledBy && <span className="muted small">Кто отменил: {appointment.cancelledBy === 'admin' ? 'администратор' : 'пациент'}</span>}
+          {appointment.rescheduledFrom && <span className="muted small">Перенесено: {formatDate(appointment.rescheduledFrom)} {formatTime(appointment.rescheduledFrom)} → {formatDate(appointment.startsAt)} {formatTime(appointment.startsAt)}</span>}
+          {appointment.rescheduledBy && <span className="muted small">Кто перенёс: {actorLabels[appointment.rescheduledBy]}</span>}
+          {appointment.rescheduledAt && <span className="muted small">Время переноса: {formatDateTime(appointment.rescheduledAt)}</span>}
+          {appointment.status === 'cancelled' && appointment.cancelledBy && <span className="muted small">Кто отменил: {actorLabels[appointment.cancelledBy]}</span>}
           {appointment.status === 'cancelled' && appointment.cancellationReason && <span className="muted small">Причина отмены: {appointment.cancellationReason}</span>}
+          {appointment.status === 'no-show' && appointment.noShowMarkedBy && <span className="muted small">Неявку отметил: {actorLabels[appointment.noShowMarkedBy]}</span>}
+          {appointment.status === 'no-show' && appointment.noShowReason && <span className="muted small">Причина неявки: {appointment.noShowReason}</span>}
       </div>
       <div className="appointment-row__side">
         <StatusPill status={appointment.status} />

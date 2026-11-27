@@ -9,7 +9,11 @@
 .admin-segmented { display: flex; max-width: 100%; }
 .admin-load-error { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
 .admin-load-error .form-message { flex: 1 1 320px; margin: 0; }
-.admin-data-note { margin: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: var(--page); font-size: 13px; line-height: 1.5; }
+.admin-arrival-date { max-width: 220px; }
+.admin-arrival { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(120px, .8fr) auto minmax(150px, .7fr); align-items: center; gap: 8px 12px; padding-block: 10px; }
+.admin-arrival__name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.admin-arrival__error { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.admin-arrival__error .form-message { flex: 1 1 300px; margin: 0; }
 
 .admin-appointment .appointment-row__side { min-width: 0; }
 .admin-appointment .appointment-row__date small { color: var(--muted); font-size: 11px; }
@@ -114,6 +118,9 @@
   .admin-filters { grid-template-columns: 1fr; }
   .admin-actions { justify-content: flex-start; }
   .admin-appointment .appointment-row__side { flex-wrap: wrap; }
+  .admin-arrival { grid-template-columns: minmax(0, 1fr) auto; }
+  .admin-arrival__shift { grid-column: 1; }
+  .admin-arrival__time { grid-column: 2; grid-row: 2; text-align: right; }
 }
 @media (max-width: 540px) {
   .admin-filters--two { grid-template-columns: 1fr 1fr; gap: 0 8px; }
@@ -126,6 +133,8 @@
   .admin-calendar { gap: 2px; }
   .admin-calendar__day { min-height: 62px; padding: 4px; }
   .admin-calendar__day small, .admin-calendar__day em { font-size: 9px; }
+  .admin-arrival { grid-template-columns: 1fr; }
+  .admin-arrival__shift, .admin-arrival__time { grid-column: 1; grid-row: auto; text-align: left; }
   .access-table { font-size: 12px; }
   .access-table th, .access-table td { padding: 8px 4px; }
   .access-table thead th { font-size: 9px; letter-spacing: 0; }

@@ -38,6 +38,14 @@ export function usePatientData(patientId: string | undefined) {
 
   useEffect(() => { void reload() }, [reload])
 
+  useEffect(() => {
+    const refreshFromDemoStore = (event: StorageEvent) => {
+      if (!event.key || event.key.startsWith('sana-clinic.database.')) void reload()
+    }
+    window.addEventListener('storage', refreshFromDemoStore)
+    return () => window.removeEventListener('storage', refreshFromDemoStore)
+  }, [reload])
+
   const doctorOf = (id: string) => data?.doctors.find((doctor) => doctor.id === id)
   const serviceOf = (id: string) => data?.services.find((service) => service.id === id)
 

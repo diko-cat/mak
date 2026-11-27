@@ -39,7 +39,7 @@ export function SiteHeader() {
   async function switchRole(role: Role) {
     try {
       setSession(await login(await getDemoCredentials(role)))
-      navigate(roleHomePath(role))
+      navigate(roleHomePath(role), { state: null })
     } catch {
       clearSession()
       navigate(`/login?role=${role}`)

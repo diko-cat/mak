@@ -155,7 +155,11 @@ export function ContactsSection({ clinic, doctors, page }: SectionProps & { clin
   const [form, setForm] = useState({ name: '', phone: '', preferredTime: '' })
   const [requestState, setRequestState] = useState<'idle' | 'sending' | 'success' | 'error'>('idle')
   const [requestError, setRequestError] = useState('')
-  const phoneHref = clinic?.phone.replace(/[^\d+]/g, '') ?? ''
+  const isDemoClinic = clinic?.email.toLowerCase().endsWith('.demo') ?? true
+  const phone = isDemoClinic ? '' : clinic?.phone ?? ''
+  const phoneHref = phone.replace(/[^\d+]/g, '')
+  const address = isDemoClinic ? '' : clinic?.address ?? ''
+  const email = isDemoClinic ? '' : clinic?.email ?? ''
   const Heading = page ? 'h1' : 'h2'
   const hours = clinicWorkingHours(doctors)
   const range = workingRange(hours)
@@ -176,7 +180,7 @@ export function ContactsSection({ clinic, doctors, page }: SectionProps & { clin
       setForm({ name: '', phone: '', preferredTime: '' })
     } catch (error) {
       setRequestState('error')
-      setRequestError(error instanceof Error ? error.message : 'Не удалось отправить заявку. Попробуйте ещё раз.')
+      setRequestError(error instanceof Error ? error.message : 'Не удалось сохранить демо-заявку. Попробуйте ещё раз.')
     }
   }
 
@@ -186,22 +190,22 @@ export function ContactsSection({ clinic, doctors, page }: SectionProps & { clin
         <div className="contact-copy">
           <p className="eyebrow">МЫ НА СВЯЗИ</p>
           <Heading>Есть вопрос?<br /><em>Давайте обсудим.</em></Heading>
-          <p>Оставьте номер — администратор позвонит, ответит на вопросы и поможет выбрать удобное время.</p>
+          <p>Это демонстрационная форма. Заявка останется в этом браузере; сотрудники клиники её не получат и не позвонят вам.</p>
           <div className="contact-details">
-            {clinic?.phone && phoneHref ? <a href={`tel:${phoneHref}`}><span><Phone size={17} /></span><div><small>ТЕЛЕФОН</small><strong>{clinic.phone}</strong></div><ArrowUpRight size={15} /></a> : <div><span><Phone size={17} /></span><div><small>ТЕЛЕФОН</small><strong>Официальный номер не указан в демо-версии</strong></div></div>}
-            <div><span><MapPin size={17} /></span><div><small>АДРЕС</small><strong>{clinic?.address || 'Официальный адрес не указан в демо-версии'}</strong></div></div>
-            {clinic?.email && <a href={`mailto:${clinic.email}`}><span><Mail size={17} /></span><div><small>ПОЧТА</small><strong>{clinic.email}</strong></div><ArrowUpRight size={15} /></a>}
+            {phone && phoneHref ? <a href={`tel:${phoneHref}`}><span><Phone size={17} /></span><div><small>ТЕЛЕФОН</small><strong>{phone}</strong></div><ArrowUpRight size={15} /></a> : <div><span><Phone size={17} /></span><div><small>ТЕЛЕФОН</small><strong>Официальный номер не подтверждён в демо-версии</strong></div></div>}
+            <div><span><MapPin size={17} /></span><div><small>АДРЕС</small><strong>{address || 'Официальный адрес не подтверждён в демо-версии'}</strong></div></div>
+            {email ? <a href={`mailto:${email}`}><span><Mail size={17} /></span><div><small>ПОЧТА</small><strong>{email}</strong></div><ArrowUpRight size={15} /></a> : <div><span><Mail size={17} /></span><div><small>ПОЧТА</small><strong>Официальная почта не подтверждена в демо-версии</strong></div></div>}
             <div><span><Clock3 size={17} /></span><div><small>ЧАСЫ РАБОТЫ</small><strong>{doctors.length ? describeHours(hours) : 'Загружаем…'}</strong></div></div>
           </div>
         </div>
         <form className="callback-card" onSubmit={submitCallback}>
           <div className="callback-card__top"><span className="callback-icon"><MessageCircleHeart size={20} /></span><span className="callback-label">ОБРАТНЫЙ ЗВОНОК</span><span className="callback-steps">01 <i>/</i> 03</span></div>
           <h3>Заявка на обратный звонок</h3>
-          <p>В демо-версии заявка сохраняется только в этом браузере и не отправляется в клинику.</p>
+          <p>Демо-заявка сохраняется только в этом браузере. Она не отправляется в клинику.</p>
           <label className="form-field"><span>Ваше имя</span><input required minLength={2} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Например, Алия" autoComplete="name" /></label>
           <label className="form-field"><span>Номер телефона</span><input required type="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="+7 (___) ___-__-__" autoComplete="tel" /></label>
           <label className="form-field"><span>Когда удобнее позвонить <small>необязательно</small></span><select value={form.preferredTime} onChange={(event) => setForm({ ...form, preferredTime: event.target.value })}><option value="">Выберите время</option>{callTimes.map((option) => <option key={option}>{option}</option>)}</select></label>
-          <Button className="callback-submit" type="submit" disabled={requestState === 'sending'}>{requestState === 'sending' ? 'Отправляем…' : 'Жду звонка'} <ArrowRight size={17} /></Button>
+          <Button className="callback-submit" type="submit" disabled={requestState === 'sending'}>{requestState === 'sending' ? 'Сохраняем…' : 'Сохранить демо-заявку'} <ArrowRight size={17} /></Button>
           {requestState === 'success' && <p className="form-message form-message--success" role="status"><Check size={16} /> Демо-заявка сохранена в этом браузере.</p>}
           {requestState === 'error' && <p className="form-message form-message--error" role="alert">{requestError}</p>}
           <small className="form-privacy">Демо-заявка остаётся в этом браузере. <Link to="/privacy">Политика конфиденциальности</Link></small>

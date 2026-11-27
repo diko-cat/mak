@@ -229,8 +229,8 @@ export function PatientBooking({ patient, patientId }: { patient: ReturnType<typ
     return (
       <Panel className="booking-done">
         <span className="booking-done__icon"><CheckCircle2 size={28} /></span>
-        <h2>Заявка отправлена</h2>
-        <p className="muted">Администратор подтвердит её и позвонит вам.</p>
+        <h2>Демо-запись сохранена</h2>
+        <p className="muted">Она доступна в демо-кабинетах только в этом браузере. Клиника не получила запись и не отправит подтверждение.</p>
         <AppointmentTicket appointment={created} doctor={doctorOf(created.doctorId)} service={serviceOf(created.serviceId)} />
         <div className="row-actions">
           <Link className={buttonStyles('primary')} to="/patient/appointments">Мои записи <ArrowRight size={15} /></Link>

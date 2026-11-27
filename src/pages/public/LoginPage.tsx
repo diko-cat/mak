@@ -42,7 +42,8 @@ export function LoginPage() {
   }, [role])
 
   function selectRole(nextRole: Role) {
-    setSearchParams({ role: nextRole }, { state: location.state })
+    setError('')
+    setSearchParams({ role: nextRole }, { state: state?.from ? { from: state.from } : null })
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -57,7 +58,7 @@ export function LoginPage() {
       const destination = requestedPath && requestedRole === user.role
         ? `${requestedPath}${state?.from?.search ?? ''}${state?.from?.hash ?? ''}`
         : roleHomePath(user.role)
-      navigate(destination, { replace: true })
+      navigate(destination, { replace: true, state: null })
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : 'Не удалось войти. Попробуйте ещё раз.')
     } finally {
@@ -98,7 +99,7 @@ export function LoginPage() {
             {error && <p className="form-message form-message--error" role="alert">{error}</p>}
             <Button className="login-submit" type="submit" disabled={loading}>{loading ? 'Входим…' : 'Войти в демо-кабинет'} <ArrowRight size={17} /></Button>
           </form>
-          <div className="demo-hint"><span><ShieldCheck size={15} /></span><p>Демо-данные для выбранной роли подставляются автоматически. Можно нажать «Войти» сразу.</p></div>
+          <div className="demo-hint"><span><ShieldCheck size={15} /></span><p>Демо-данные хранятся только в этом браузере и не синхронизируются между устройствами. Демо-роли нужны для просмотра и не обеспечивают настоящую защиту доступа; формы и уведомления в клинику не отправляются. Для входа в выбранную роль можно нажать «Войти» сразу.</p></div>
           <div className="login-card__footer"><span>Не нужно регистрироваться</span><span><UserRound size={14} /> Данные сохраняются только в этом браузере</span></div>
         </section>
       </div>
