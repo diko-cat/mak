@@ -11,6 +11,10 @@ export const rolePermissions: Record<Role, readonly Permission[]> = {
   doctor: [
     'appointments:view-own',
     'appointments:complete',
+    'appointments:cancel-assigned',
+    'appointments:mark-no-show-assigned',
+    'appointments:reschedule-assigned',
+    'attendance:check-in',
     'patients:view-own',
   ],
   admin: [
@@ -23,6 +27,7 @@ export const rolePermissions: Record<Role, readonly Permission[]> = {
     'services:manage',
     'schedule:manage',
     'calls:manage',
+    'attendance:view-all',
   ],
 }
 
@@ -35,6 +40,11 @@ export const permissionLabels: Record<Permission, string> = {
   'appointments:reschedule': 'Переносить приёмы',
   'appointments:cancel-any': 'Отменять любые приёмы',
   'appointments:complete': 'Завершать приём с заключением',
+  'appointments:cancel-assigned': 'Отменять свои приёмы с указанием причины',
+  'appointments:mark-no-show-assigned': 'Отмечать неявку на свой прошедший приём',
+  'appointments:reschedule-assigned': 'Переносить свои приёмы (без смены врача)',
+  'attendance:check-in': 'Отмечать своё прибытие на работу',
+  'attendance:view-all': 'Видеть прибытие всех врачей',
   'results:view-own': 'Видеть свои заключения и анализы',
   'patients:view-own': 'Видеть карты своих пациентов',
   'patients:view-all': 'Видеть всех пациентов',

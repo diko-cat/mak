@@ -4,6 +4,7 @@ import type {
   Clinic,
   DemoAccount,
   Doctor,
+  DoctorArrival,
   LabTest,
   MedicalConclusion,
   Patient,
@@ -21,6 +22,8 @@ export interface MockDatabase {
   conclusions: MedicalConclusion[]
   labTests: LabTest[]
   callRequests: CallRequest[]
+  /** Отметки врачей о прибытии; в данных, сохранённых до этой версии, поля нет. */
+  doctorArrivals: DoctorArrival[]
 }
 
 export const DATABASE_KEY = 'sana-clinic.database.v5'
@@ -34,7 +37,8 @@ const atDayAndHour = (dayOffset: number, hour: number, minute = 0) => {
   return value.toISOString()
 }
 
-function localDayKey(date = new Date()): string {
+/** Локальная дата приложения в формате YYYY-MM-DD. */
+export function localDayKey(date = new Date()): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
@@ -91,12 +95,22 @@ function refreshDailyDemoAppointments(database: MockDatabase): void {
     firstSeed.status = 'confirmed'
     delete firstSeed.cancelledBy
     delete firstSeed.cancellationReason
+    delete firstSeed.noShowMarkedBy
+    delete firstSeed.noShowReason
+    delete firstSeed.rescheduledFrom
+    delete firstSeed.rescheduledBy
+    delete firstSeed.rescheduledAt
   }
   if (secondSeed) {
     secondSeed.startsAt = second
     secondSeed.status = 'requested'
     delete secondSeed.cancelledBy
     delete secondSeed.cancellationReason
+    delete secondSeed.noShowMarkedBy
+    delete secondSeed.noShowReason
+    delete secondSeed.rescheduledFrom
+    delete secondSeed.rescheduledBy
+    delete secondSeed.rescheduledAt
   }
   window.localStorage.setItem(DEMO_DAY_KEY, today)
   writeDatabase(database)
@@ -127,6 +141,29 @@ function migrateDaysOff(database: MockDatabase): boolean {
     migrated = true
   }
   return migrated
+}
+
+const isArrival = (value: unknown): value is DoctorArrival => {
+  if (!value || typeof value !== 'object') return false
+  const entry = value as Record<string, unknown>
+  return typeof entry.doctorId === 'string'
+    && typeof entry.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(entry.date)
+    && typeof entry.arrivedAt === 'string' && !Number.isNaN(new Date(entry.arrivedAt).getTime())
+}
+
+/** Добавляет `doctorArrivals` в старые данные, убирает битые записи и дубли (оставляет самую раннюю отметку). */
+function normalizeArrivals(database: MockDatabase): boolean {
+  const source: unknown[] = Array.isArray(database.doctorArrivals) ? database.doctorArrivals : []
+  const byDay = new Map<string, DoctorArrival>()
+  for (const entry of source.filter(isArrival)) {
+    const key = `${entry.doctorId}|${entry.date}`
+    const current = byDay.get(key)
+    if (!current || entry.arrivedAt < current.arrivedAt) byDay.set(key, { doctorId: entry.doctorId, date: entry.date, arrivedAt: entry.arrivedAt })
+  }
+  const normalized = [...byDay.values()]
+  const changed = !Array.isArray(database.doctorArrivals) || normalized.length !== source.length
+  database.doctorArrivals = normalized
+  return changed
 }
 
 /** YYYY-MM-DD через `dayOffset` дней от сегодня, в локальном времени. */
@@ -236,6 +273,7 @@ export function createSeedDatabase(): MockDatabase {
       { id: 'call-1', name: 'Дана', phone: '+7 701 000 00 01', preferredTime: 'После 18:00', createdAt: atDayAndHour(-1, 15), status: 'new' },
       { id: 'call-2', name: 'Арман', phone: '+7 702 000 00 02', preferredTime: 'Утром', createdAt: atDayAndHour(-2, 10), status: 'contacted' },
     ],
+    doctorArrivals: [],
   }
 }
 
@@ -246,7 +284,8 @@ export function readDatabase(): MockDatabase {
   if (raw) {
     try {
       const database = JSON.parse(raw) as MockDatabase
-      if (migrateDaysOff(database)) writeDatabase(database)
+      const migrated = migrateDaysOff(database)
+      if (normalizeArrivals(database) || migrated) writeDatabase(database)
       refreshDailyDemoAppointments(database)
       return database
     } catch {
@@ -259,6 +298,7 @@ export function readDatabase(): MockDatabase {
     try {
       const database = JSON.parse(legacyRaw) as MockDatabase
       migrateDaysOff(database)
+      normalizeArrivals(database)
       writeDatabase(database)
       refreshDailyDemoAppointments(database)
       return database

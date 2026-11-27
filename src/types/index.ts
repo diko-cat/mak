@@ -111,9 +111,28 @@ export interface Appointment {
   note?: string
   /** Номер талона, выдаётся при записи. */
   ticketNumber?: string
-  cancelledBy?: 'patient' | 'admin'
+  /** Кто отменил запись. */
+  cancelledBy?: Role
   cancellationReason?: string
+  /** Время первоначальной записи до первого переноса (ISO). */
   rescheduledFrom?: string
+  /** Кто перенёс запись последним. */
+  rescheduledBy?: Exclude<Role, 'patient'>
+  /** Когда запись перенесли последний раз (ISO). */
+  rescheduledAt?: string
+  /** Кто отметил неявку пациента. */
+  noShowMarkedBy?: Exclude<Role, 'patient'>
+  /** Причина или комментарий к неявке. */
+  noShowReason?: string
+}
+
+/** Отметка врача о прибытии на работу. Одна на врача за локальный день. */
+export interface DoctorArrival {
+  doctorId: string
+  /** Локальная дата приложения, YYYY-MM-DD. */
+  date: string
+  /** Момент отметки, ISO. */
+  arrivedAt: string
 }
 
 export interface MedicalConclusion {
@@ -217,6 +236,11 @@ export type Permission =
   | 'appointments:reschedule'
   | 'appointments:cancel-any'
   | 'appointments:complete'
+  | 'appointments:cancel-assigned'
+  | 'appointments:mark-no-show-assigned'
+  | 'appointments:reschedule-assigned'
+  | 'attendance:check-in'
+  | 'attendance:view-all'
   | 'results:view-own'
   | 'patients:view-own'
   | 'patients:view-all'

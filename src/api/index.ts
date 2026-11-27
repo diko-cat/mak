@@ -14,6 +14,7 @@ import {
   type CreateLabTestInput,
   type DemoAccount,
   type DoctorAbsence,
+  type DoctorArrival,
   type Doctor,
   type DoctorInput,
   type LabTest,
@@ -29,7 +30,7 @@ import {
 } from '../types'
 import { hasPermission, roleLabels } from '../auth/permissions'
 import { getSession } from '../store/session'
-import { createId, readDatabase, resetDemoDatabase, writeDatabase, type MockDatabase } from './database'
+import { createId, localDayKey, readDatabase, resetDemoDatabase, writeDatabase, type MockDatabase } from './database'
 import { fitsWorkingHours, intervalFor, isValidTime, SLOT_STEP_MINUTES, toMinutes, WEEKDAY_NAMES, WEEK_ORDER } from './schedule'
 
 /**
@@ -258,42 +259,69 @@ function nextTicketNumber(database: MockDatabase): string {
   return `Т-${highest + 1}`
 }
 
+/** Запись закреплена за врачом из сессии. */
+const isAssignedDoctor = (user: User, appointment: Appointment) =>
+  user.role === 'doctor' && Boolean(user.doctorId) && user.doctorId === appointment.doctorId
+
+/**
+ * Врач может действовать только со своими записями и при наличии `assignedPermission`;
+ * остальные роли проходят по праву администратора `anyPermission`.
+ */
+function requireAppointmentAction(appointment: Appointment, assignedPermission: Permission, anyPermission: Permission): User {
+  if (getSession()?.role === 'doctor') {
+    const doctor = requirePermission(assignedPermission)
+    if (!isAssignedDoctor(doctor, appointment)) throw new ApiError('Можно изменять только свои приёмы.', 'FORBIDDEN')
+    return doctor
+  }
+  return requirePermission(anyPermission)
+}
+
 /**
  * Смена статуса записи с проверкой прав и допустимых переходов:
- * подтвердить — администратор (только ожидающую), отменить — администратор любую
- * запланированную или пациент свою. Завершение приёма идёт через `completeAppointment`.
+ * - подтвердить — администратор (только ожидающую);
+ * - отменить — администратор любую активную, пациент свою, врач свою;
+ *   причина обязательна для врача и администратора;
+ * - неявка — администратор или врач у своего прошедшего приёма; причина обязательна для врача.
+ * Завершение приёма идёт через `completeAppointment`.
  */
 export async function updateAppointmentStatus(id: string, status: AppointmentStatus, reason?: string): Promise<Appointment> {
   const database = readDatabase()
   const appointment = database.appointments.find((entry) => entry.id === id)
   if (!appointment) throw new ApiError('Запись не найдена.', 'APPOINTMENT_NOT_FOUND')
   const user = getSession()
+  const trimmedReason = reason?.trim() ?? ''
 
   if (status === 'confirmed') {
     requirePermission('appointments:confirm')
     if (appointment.status !== 'requested') throw new ApiError('Подтвердить можно только запись, ожидающую подтверждения.', 'INVALID_STATUS_TRANSITION')
     appointment.confirmedAt = new Date().toISOString()
+    appointment.status = 'confirmed'
   } else if (status === 'cancelled') {
-    const ownRecord = user?.role === 'patient' && user.patientId === appointment.patientId
-    if (!hasPermission(user, 'appointments:cancel-any') && !(ownRecord && hasPermission(user, 'appointments:cancel-own'))) {
-      requirePermission('appointments:cancel-any')
+    let actor: User
+    if (user?.role === 'patient') {
+      actor = requirePermission('appointments:cancel-own')
+      if (actor.patientId !== appointment.patientId) throw new ApiError('Отменить можно только свою запись.', 'FORBIDDEN')
+    } else {
+      actor = requireAppointmentAction(appointment, 'appointments:cancel-assigned', 'appointments:cancel-any')
     }
     if (!isActiveStatus(appointment.status)) throw new ApiError('Эту запись уже нельзя отменить.', 'INVALID_STATUS_TRANSITION')
-    if (!reason?.trim() && user?.role === 'admin') throw new ApiError('Укажите причину отмены.', 'VALIDATION_ERROR')
+    if (!trimmedReason && actor.role !== 'patient') throw new ApiError('Укажите причину отмены.', 'VALIDATION_ERROR')
+    appointment.status = 'cancelled'
+    appointment.cancelledBy = actor.role
+    appointment.cancellationReason = trimmedReason || undefined
   } else if (status === 'no-show') {
-    requirePermission('appointments:cancel-any')
+    const actor = requireAppointmentAction(appointment, 'appointments:mark-no-show-assigned', 'appointments:cancel-any')
     if (!isActiveStatus(appointment.status) || new Date(appointment.startsAt).getTime() > Date.now()) {
       throw new ApiError('Отметить неявку можно только у прошедшего незакрытого приёма.', 'INVALID_STATUS_TRANSITION')
     }
+    if (!trimmedReason && actor.role === 'doctor') throw new ApiError('Укажите причину неявки.', 'VALIDATION_ERROR')
+    appointment.status = 'no-show'
+    appointment.noShowMarkedBy = actor.role === 'doctor' ? 'doctor' : 'admin'
+    appointment.noShowReason = trimmedReason || undefined
   } else {
     throw new ApiError('Такой переход статуса недоступен.', 'INVALID_STATUS_TRANSITION')
   }
 
-  appointment.status = status
-  if (status === 'cancelled') {
-    appointment.cancelledBy = user?.role === 'admin' ? 'admin' : 'patient'
-    appointment.cancellationReason = reason?.trim() || undefined
-  }
   writeDatabase(database)
   return appointment
 }
@@ -457,12 +485,19 @@ export async function updateCallRequestStatus(id: string, status: CallRequest['s
 
 /* ───────────── Администратор: записи ───────────── */
 
-/** Перенос приёма на другое время (и при необходимости к другому врачу той же специальности). */
+/**
+ * Перенос приёма на другое время. Администратор может передать приём другому врачу той же специальности,
+ * врач переносит только свой приём и только к себе. Слот проверяется заново: прошедшее время,
+ * рабочие часы и отсутствия врача, занятость врача и пациента. Запись и талон остаются прежними.
+ */
 export async function rescheduleAppointment(id: string, startsAtIso: string, doctorId?: string): Promise<Appointment> {
-  requirePermission('appointments:reschedule')
   const database = readDatabase()
   const appointment = database.appointments.find((entry) => entry.id === id)
   if (!appointment) throw new ApiError('Запись не найдена.', 'APPOINTMENT_NOT_FOUND')
+  const actor = requireAppointmentAction(appointment, 'appointments:reschedule-assigned', 'appointments:reschedule')
+  if (actor.role === 'doctor' && doctorId && doctorId !== appointment.doctorId) {
+    throw new ApiError('Передать приём другому врачу может только администратор.', 'FORBIDDEN')
+  }
   if (!isActiveStatus(appointment.status)) throw new ApiError('Перенести можно только запланированный приём.', 'INVALID_STATUS_TRANSITION')
   const doctor = database.doctors.find((entry) => entry.id === (doctorId ?? appointment.doctorId))
   const service = database.services.find((entry) => entry.id === appointment.serviceId)
@@ -474,14 +509,62 @@ export async function rescheduleAppointment(id: string, startsAtIso: string, doc
   if (Number.isNaN(startsAt.getTime())) throw new ApiError('Выберите корректную дату и время.', 'INVALID_APPOINTMENT_TIME')
   if (startsAt.getTime() <= Date.now()) throw new ApiError('Нельзя перенести приём на прошедшее время.', 'PAST_APPOINTMENT')
   if (!fitsWorkingHours(doctor, startsAt, duration)) throw new ApiError('Врач не принимает в это время.', 'OUTSIDE_WORKING_HOURS')
+  if (doctor.id === appointment.doctorId && startsAt.getTime() === new Date(appointment.startsAt).getTime()) {
+    throw new ApiError('Приём уже назначен на это время.', 'SAME_APPOINTMENT_TIME')
+  }
   if (database.appointments.some((entry) => appointmentConflicts(entry, database, doctor.id, startsAt, duration, appointment.id))) {
     throw new ApiError('Это время уже занято. Выберите другой слот.', 'SLOT_TAKEN')
+  }
+  if (database.appointments.some((entry) => entry.id !== appointment.id && patientAppointmentConflict(entry, database, appointment.patientId, startsAt, duration))) {
+    throw new ApiError('У пациента уже есть другая запись на это время.', 'PATIENT_APPOINTMENT_CONFLICT')
   }
   appointment.doctorId = doctor.id
   appointment.rescheduledFrom ??= appointment.startsAt
   appointment.startsAt = startsAt.toISOString()
+  appointment.rescheduledBy = actor.role === 'doctor' ? 'doctor' : 'admin'
+  appointment.rescheduledAt = new Date().toISOString()
   writeDatabase(database)
   return appointment
+}
+
+/* ───────────── Прибытие врачей ───────────── */
+
+/**
+ * Врач отмечает прибытие за себя на сегодняшний локальный день.
+ * Повторный вызов в тот же день не создаёт дубль и возвращает первую отметку.
+ */
+export async function markDoctorArrival(): Promise<DoctorArrival> {
+  const user = requirePermission('attendance:check-in')
+  const database = readDatabase()
+  if (!user.doctorId || !database.doctors.some((doctor) => doctor.id === user.doctorId)) {
+    throw new ApiError('Профиль врача не найден.', 'DOCTOR_NOT_FOUND')
+  }
+  const now = new Date()
+  const date = localDayKey(now)
+  const existing = database.doctorArrivals.find((entry) => entry.doctorId === user.doctorId && entry.date === date)
+  if (existing) return { ...existing }
+  const arrival: DoctorArrival = { doctorId: user.doctorId, date, arrivedAt: now.toISOString() }
+  database.doctorArrivals.push(arrival)
+  writeDatabase(database)
+  return { ...arrival }
+}
+
+/** Своя отметка врача за день (YYYY-MM-DD, по умолчанию сегодня) или `null`, если отметки нет. */
+export async function getMyArrival(date: string = localDayKey()): Promise<DoctorArrival | null> {
+  const user = requirePermission('attendance:check-in')
+  if (!validDateKey(date)) throw new ApiError('Выберите корректную дату.', 'VALIDATION_ERROR')
+  const arrival = readDatabase().doctorArrivals.find((entry) => entry.doctorId === user.doctorId && entry.date === date)
+  return arrival ? { ...arrival } : null
+}
+
+/** Отметки всех врачей за день (YYYY-MM-DD, по умолчанию сегодня), по времени прибытия. Только администратор. */
+export async function getDoctorArrivals(date: string = localDayKey()): Promise<DoctorArrival[]> {
+  requirePermission('attendance:view-all')
+  if (!validDateKey(date)) throw new ApiError('Выберите корректную дату.', 'VALIDATION_ERROR')
+  return readDatabase().doctorArrivals
+    .filter((entry) => entry.date === date)
+    .map((entry) => ({ ...entry }))
+    .sort((left, right) => left.arrivedAt.localeCompare(right.arrivedAt))
 }
 
 /* ───────────── Администратор: врачи ───────────── */
