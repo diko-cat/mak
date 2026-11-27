@@ -49,6 +49,10 @@ export function AdminOverview({ admin }: { admin: AdminState }) {
         {stats.map(([label, value]) => <div key={label} className="admin-stat"><small>{label}</small><strong>{value}</strong></div>)}
       </div>
 
+      <Panel title="Прибытие врачей · сегодня" className="cabinet-grid__wide">
+        <p className="admin-data-note">Отметки о прибытии пока недоступны: текущий API не возвращает время или события прибытия врачей.</p>
+      </Panel>
+
       {error && <p className="form-message form-message--error cabinet-grid__wide" role="alert">{error}</p>}
 
       {needsTransfer.length > 0 && <Panel title={`Изменения расписания · ${needsTransfer.length}`}><Link className="text-link" to="/admin/appointments?status=requires-transfer">Открыть записи, требующие переноса <ArrowRight size={13} /></Link></Panel>}

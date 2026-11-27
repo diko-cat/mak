@@ -147,8 +147,14 @@ function AppointmentItem({ appointment, admin, onDone, initialMode, excludeCurre
   return (
     <li className="appointment-row admin-appointment">
       <div className="appointment-row__date">
-        <strong>{formatDate(appointment.startsAt)}</strong>
-        <span><Clock3 size={13} aria-hidden="true" />{formatTime(appointment.startsAt)}</span>
+        {appointment.rescheduledFrom ? <>
+          <small>Новая дата</small>
+          <strong>{formatDate(appointment.startsAt)}</strong>
+          <span><Clock3 size={13} aria-hidden="true" />{formatTime(appointment.startsAt)}</span>
+        </> : <>
+          <strong>{formatDate(appointment.startsAt)}</strong>
+          <span><Clock3 size={13} aria-hidden="true" />{formatTime(appointment.startsAt)}</span>
+        </>}
       </div>
       <div className="appointment-row__body">
         <strong>{patient?.name ?? 'Пациент'}</strong>
@@ -159,8 +165,10 @@ function AppointmentItem({ appointment, admin, onDone, initialMode, excludeCurre
           {service && <span>{formatPrice(service.price)}</span>}
         </div>
           {appointment.note && <span className="muted small">Причина: {appointment.note}</span>}
-          {appointment.rescheduledFrom && <span className="muted small">Перенесено с {formatDate(appointment.rescheduledFrom)} {formatTime(appointment.rescheduledFrom)}</span>}
-          {appointment.status === 'cancelled' && appointment.cancelledBy === 'admin' && appointment.cancellationReason && <span className="muted small">Клиника отменила: {appointment.cancellationReason}</span>}
+          {appointment.rescheduledFrom && <span className="muted small">Прежняя дата и время: {formatDate(appointment.rescheduledFrom)} {formatTime(appointment.rescheduledFrom)}</span>}
+          {appointment.rescheduledFrom && <span className="muted small">Перенесено на: {formatDate(appointment.startsAt)} {formatTime(appointment.startsAt)}</span>}
+          {appointment.status === 'cancelled' && appointment.cancelledBy && <span className="muted small">Кто отменил: {appointment.cancelledBy === 'admin' ? 'администратор' : 'пациент'}</span>}
+          {appointment.status === 'cancelled' && appointment.cancellationReason && <span className="muted small">Причина отмены: {appointment.cancellationReason}</span>}
       </div>
       <div className="appointment-row__side">
         <StatusPill status={appointment.status} />

@@ -7,8 +7,12 @@
 .cabinet .cabinet-field input, .cabinet .cabinet-field select { min-width: 0; min-height: 44px; border-radius: 10px; font-size: 14px; }
 .cabinet .cabinet-field textarea { border-radius: 10px; }
 .admin-segmented { display: flex; max-width: 100%; }
+.admin-load-error { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.admin-load-error .form-message { flex: 1 1 320px; margin: 0; }
+.admin-data-note { margin: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: var(--page); font-size: 13px; line-height: 1.5; }
 
 .admin-appointment .appointment-row__side { min-width: 0; }
+.admin-appointment .appointment-row__date small { color: var(--muted); font-size: 11px; }
 .admin-actions { justify-content: flex-end; }
 .admin-appointment__error { grid-column: 1 / -1; margin: 0; }
 .admin-reschedule { grid-column: 1 / -1; padding: 14px; border: 1px solid color-mix(in srgb, var(--green) 35%, var(--line)); border-radius: 10px; background: var(--surface); }

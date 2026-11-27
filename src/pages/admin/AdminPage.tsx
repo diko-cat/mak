@@ -1,6 +1,7 @@
 ﻿import { CalendarClock, ClipboardList, KeyRound, LayoutDashboard, Stethoscope, Tags } from 'lucide-react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { hasPermission } from '../../auth/permissions'
+import { Button } from '../../components/ui'
 import { useSession } from '../../store/session'
 import type { Permission } from '../../types'
 import { CabinetLayout, LoadingNote, type CabinetTab } from '../cabinet/CabinetLayout'
@@ -30,7 +31,15 @@ export function AdminPage() {
 
   return (
     <CabinetLayout eyebrow="КАБИНЕТ АДМИНИСТРАТОРА" title={user?.name ?? 'Администратор'} subtitle="Записи, врачи, услуги и расписание клиники" tabs={tabs}>
-      {admin.error ? <p className="form-message form-message--error" role="alert">{admin.error}</p> : !admin.data ? <LoadingNote /> : (
+      {!admin.data && admin.loading ? <LoadingNote /> : !admin.data ? (
+        <div className="stack">
+          <p className="form-message form-message--error" role="alert">{admin.error || 'Не удалось загрузить данные панели.'}</p>
+          <Button type="button" variant="secondary" onClick={() => void admin.reload()}>Повторить загрузку</Button>
+        </div>
+      ) : (
+        <>
+        {admin.loading && <p className="muted small" role="status">Обновляем данные…</p>}
+        {admin.error && <div className="admin-load-error" role="alert"><p className="form-message form-message--error">{admin.error} Показаны последние загруженные данные.</p><Button type="button" variant="secondary" className="button--compact" onClick={() => void admin.reload()}>Повторить</Button></div>}
         <Routes>
           <Route index element={<AdminOverview admin={admin} />} />
           {allowed('appointments:view-all') && <Route path="appointments" element={<AdminAppointments admin={admin} />} />}
@@ -40,6 +49,7 @@ export function AdminPage() {
           <Route path="access" element={<AdminAccess onReset={admin.reload} />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
+        </>
       )}
     </CabinetLayout>
   )
