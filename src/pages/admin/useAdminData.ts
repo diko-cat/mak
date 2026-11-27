@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { getAppointments, getCallRequests, getDoctors, getLabTests, getPatients, getServices } from '../../api'
 import type { Appointment, CallRequest, Doctor, LabTest, Patient, Service } from '../../types'
 import { errorMessage } from '../cabinet/format'
+import { useDemoDataRevision } from '../../store/demoData'
 
 export interface AdminData {
   appointments: Appointment[]
@@ -33,7 +34,9 @@ export function useAdminData() {
     }
   }, [])
 
-  useEffect(() => { void reload() }, [reload])
+  // Перечитываем после любого изменения демо-данных, в том числе из другой вкладки.
+  const revision = useDemoDataRevision()
+  useEffect(() => { void reload() }, [reload, revision])
 
   const doctorOf = (id: string) => data?.doctors.find((doctor) => doctor.id === id)
   const patientOf = (id: string) => data?.patients.find((patient) => patient.id === id)
