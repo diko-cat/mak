@@ -244,7 +244,7 @@ function AppointmentActions({ appointment, doctorId, durationMinutes, reload, on
     setBusy(true)
     setError('')
     try {
-      await rescheduleAppointment(appointment.id, startsAt, appointment.doctorId)
+      await rescheduleAppointment(appointment.id, startsAt, appointment.doctorId, reason)
       await reload()
       onSuccess(`Приём перенесён на ${formatDateTime(startsAt)}. Причина: ${reason}.`)
       setMode(null)
