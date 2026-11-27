@@ -3,7 +3,7 @@ import { CheckCircle2, ChevronLeft, ChevronRight, Clock3 } from 'lucide-react'
 import { createLabTest, completeAppointment, getCalendarAvailability, getDaySlots, getMyArrival, markDoctorArrival, rescheduleAppointment, updateAppointmentStatus, updateLabTest } from '../../api'
 import { intervalFor } from '../../api/schedule'
 import { Button } from '../../components/ui'
-import type { Appointment, DaySlot, Doctor, DoctorArrival, LabTest } from '../../types'
+import { ApiError, type Appointment, type DaySlot, type Doctor, type DoctorArrival, type LabTest } from '../../types'
 import { BookingCalendar } from '../cabinet/BookingCalendar'
 import { EmptyState, LoadingNote, Panel, StatusPill } from '../cabinet/CabinetLayout'
 import { addDays, ageFrom, errorMessage, formatDate, formatDateTime, formatTime, isSameDay, isScheduled, longDayFormat, pluralYears, toDateKey } from '../cabinet/format'
@@ -14,6 +14,14 @@ type View = 'day' | 'week'
 const dateInputValue = (date: Date) => toDateKey(date)
 const statusNext: Record<LabTest['status'], LabTest['status'] | null> = { ordered: 'in-progress', 'in-progress': 'ready', ready: null }
 const statusText: Record<LabTest['status'], string> = { ordered: 'Назначен', 'in-progress': 'В работе', ready: 'Готов' }
+const cancelReasons = ['По просьбе пациента', 'Болезнь врача', 'Ошибка при записи', 'Другая причина']
+const noShowReasons = ['Пациент не отвечает', 'Пациент сообщил об опоздании', 'Не явился без предупреждения', 'Другая причина']
+const rescheduleReasons = ['По просьбе пациента', 'Изменение расписания врача', 'Медицинские обстоятельства', 'Другая причина']
+const OTHER_REASON = 'Другая причина'
+
+function formatActionReason(category: string, comment: string) {
+  return category === OTHER_REASON ? `${OTHER_REASON}: ${comment.trim()}` : category
+}
 
 export function DoctorSchedule({ doctor, profile, doctorId }: { doctor: ReturnType<typeof useDoctorData>; profile?: Doctor; doctorId?: string }) {
   const { data, patientOf, serviceOf } = doctor
@@ -100,6 +108,7 @@ export function DoctorSchedule({ doctor, profile, doctorId }: { doctor: ReturnTy
           <Button type="button" variant="quiet" className="button--compact" aria-label={view === 'day' ? 'Следующий день' : 'Следующая неделя'} onClick={() => moveDate(view === 'day' ? 1 : 7)}>{view === 'day' ? 'День' : 'Неделя'}<ChevronRight size={16} /></Button>
         </div>
         {dateKey === todayKey && <div className="doctor-arrival" aria-live="polite">
+          <p className="doctor-arrival__hint">Отметка прихода врача на смену</p>
           {arrivalLoading ? <span className="muted small">Проверяем отметку о прибытии…</span>
             : arrival ? <p className="doctor-arrival__saved" role="status"><CheckCircle2 size={17} aria-hidden="true" />Вы отметили прибытие сегодня в <strong>{formatTime(arrival.arrivedAt)}</strong>.</p>
               : <Button type="button" className="button--compact" disabled={arrivalSaving} onClick={() => void saveArrival()}>{arrivalSaving ? 'Сохраняем отметку…' : 'Отметить прибытие'}</Button>}
@@ -163,6 +172,10 @@ function AppointmentDetails({ appointment, doctor, doctorId, onActionSuccess }: 
   return (
     <Panel className="schedule__details" title="Карточка приёма" action={<StatusPill status={appointment.status} />}>
       <div className="patient-card"><span className="avatar avatar--large" aria-hidden="true">{patient?.name.split(' ').map((part) => part[0]).join('').slice(0, 2)}</span><div><h3>{patient?.name ?? 'Пациент'}</h3><dl className="facts"><div><dt>Возраст</dt><dd>{patient ? pluralYears(ageFrom(patient.birthDate)) : '—'}</dd></div><div><dt>Карта</dt><dd>{patient?.cardNumber ?? '—'}</dd></div><div><dt>Время</dt><dd>{formatDate(appointment.startsAt)}, {formatTime(appointment.startsAt)}</dd></div><div><dt>Талон</dt><dd>{appointment.ticketNumber ?? '—'}</dd></div></dl></div></div>
+      <div className={`doctor-patient-attendance doctor-patient-attendance--${appointment.status === 'completed' ? 'arrived' : appointment.status === 'no-show' ? 'absent' : 'unknown'}`} role="status">
+        {appointment.status === 'completed' ? <CheckCircle2 size={16} aria-hidden="true" /> : null}
+        <span><strong>Пациент пришёл:</strong> {appointment.status === 'completed' ? 'да' : appointment.status === 'no-show' ? 'нет' : 'не отмечено'}</span>
+      </div>
       <div className="detail-block"><p className="detail-block__label">Услуга</p><p>{service?.name ?? '—'}</p><p className="detail-block__label">Причина обращения</p><p>{appointment.note || 'Не указана'}</p></div>
       <AppointmentActions appointment={appointment} doctorId={doctorId} durationMinutes={service?.durationMinutes ?? 30} reload={reload} onSuccess={onActionSuccess} />
       <div className="segmented" role="tablist" aria-label="Карточка пациента"><button type="button" role="tab" aria-selected={tab === 'visit'} className={`segmented__item ${tab === 'visit' ? 'segmented__item--active' : ''}`} onClick={() => setTab('visit')}>Приём</button><button type="button" role="tab" aria-selected={tab === 'labs'} className={`segmented__item ${tab === 'labs' ? 'segmented__item--active' : ''}`} onClick={() => setTab('labs')}>Анализы пациента · {patientLabs.length}</button></div>
@@ -194,27 +207,32 @@ function AppointmentActions({ appointment, doctorId, durationMinutes, reload, on
   onSuccess: (message: string) => void
 }) {
   const [mode, setMode] = useState<AppointmentAction | null>(null)
-  const [reason, setReason] = useState('')
+  const [reasonCategory, setReasonCategory] = useState('')
+  const [reasonComment, setReasonComment] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [availabilityRefresh, setAvailabilityRefresh] = useState(0)
+  const reasonRequired = reasonCategory !== '' && (reasonCategory !== OTHER_REASON || Boolean(reasonComment.trim()))
   const isOwnActive = Boolean(doctorId && appointment.doctorId === doctorId && isScheduled(appointment))
   const canMarkNoShow = isOwnActive && new Date(appointment.startsAt).getTime() <= Date.now()
 
   async function submitReason(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!reason.trim()) {
-      setError(mode === 'no-show' ? 'Укажите причину неявки.' : 'Укажите причину отмены.')
+    if (!reasonRequired) {
+      setError(reasonCategory === OTHER_REASON ? 'Добавьте комментарий к другой причине.' : mode === 'no-show' ? 'Выберите причину неявки.' : 'Выберите причину отмены.')
       return
     }
     if (mode !== 'cancel' && mode !== 'no-show') return
+    const reason = formatActionReason(reasonCategory, reasonComment)
     setBusy(true)
     setError('')
     try {
-      await updateAppointmentStatus(appointment.id, mode === 'cancel' ? 'cancelled' : 'no-show', reason.trim())
-      onSuccess(mode === 'cancel' ? 'Запись отменена.' : 'Неявка пациента отмечена.')
-      setReason('')
-      setMode(null)
+      await updateAppointmentStatus(appointment.id, mode === 'cancel' ? 'cancelled' : 'no-show', reason)
       await reload()
+      onSuccess(mode === 'cancel' ? 'Запись отменена.' : 'Неявка пациента отмечена.')
+      setReasonCategory('')
+      setReasonComment('')
+      setMode(null)
     } catch (actionError) {
       setError(errorMessage(actionError, mode === 'cancel' ? 'Не удалось отменить запись.' : 'Не удалось отметить неявку.'))
     } finally {
@@ -222,16 +240,19 @@ function AppointmentActions({ appointment, doctorId, durationMinutes, reload, on
     }
   }
 
-  async function submitReschedule(startsAt: string) {
+  async function submitReschedule(startsAt: string, reason: string) {
     setBusy(true)
     setError('')
     try {
-      await rescheduleAppointment(appointment.id, startsAt, appointment.doctorId)
-      onSuccess(`Приём перенесён на ${formatDateTime(startsAt)}.`)
-      setMode(null)
+      await rescheduleAppointment(appointment.id, startsAt, appointment.doctorId, reason)
       await reload()
+      onSuccess(`Приём перенесён на ${formatDateTime(startsAt)}. Причина: ${reason}.`)
+      setMode(null)
     } catch (actionError) {
-      setError(errorMessage(actionError, 'Не удалось перенести приём. Выберите другое свободное время.'))
+      setError(actionError instanceof ApiError && actionError.code === 'SLOT_TAKEN'
+        ? 'Выбранное время уже заняли. Исходная запись сохранена — выберите другой свободный слот.'
+        : errorMessage(actionError, 'Не удалось перенести приём. Выберите другое свободное время.'))
+      if (actionError instanceof ApiError && actionError.code === 'SLOT_TAKEN') setAvailabilityRefresh((value) => value + 1)
     } finally {
       setBusy(false)
     }
@@ -243,17 +264,21 @@ function AppointmentActions({ appointment, doctorId, durationMinutes, reload, on
     <h4 className="doctor-appointment-actions__title">Действия с приёмом</h4>
     <div className="row-actions">
       <Button type="button" variant="secondary" className="button--compact" disabled={busy} aria-expanded={mode === 'reschedule'} onClick={() => { setError(''); setMode(mode === 'reschedule' ? null : 'reschedule') }}>Перенести</Button>
-      <Button type="button" variant="secondary" className="button--compact" disabled={busy} aria-expanded={mode === 'cancel'} onClick={() => { setError(''); setMode(mode === 'cancel' ? null : 'cancel') }}>Отменить</Button>
-      {canMarkNoShow && <Button type="button" variant="secondary" className="button--compact" disabled={busy} aria-expanded={mode === 'no-show'} onClick={() => { setError(''); setMode(mode === 'no-show' ? null : 'no-show') }}>Пациент не явился</Button>}
+      <Button type="button" variant="secondary" className="button--compact" disabled={busy} aria-expanded={mode === 'cancel'} onClick={() => { setError(''); setReasonCategory(''); setReasonComment(''); setMode(mode === 'cancel' ? null : 'cancel') }}>Отменить</Button>
+      {canMarkNoShow && <Button type="button" variant="secondary" className="button--compact" disabled={busy} aria-expanded={mode === 'no-show'} onClick={() => { setError(''); setReasonCategory(''); setReasonComment(''); setMode(mode === 'no-show' ? null : 'no-show') }}>Пациент не явился</Button>}
     </div>
     {(mode === 'cancel' || mode === 'no-show') && <form className="doctor-action-form" onSubmit={submitReason} noValidate>
       <label className="form-field cabinet-field">
-        <span>{mode === 'cancel' ? 'Причина отмены' : 'Причина неявки'}</span>
-        <textarea rows={3} value={reason} disabled={busy} aria-invalid={Boolean(error)} aria-describedby={error ? 'doctor-action-error' : undefined} onChange={(event) => { setReason(event.target.value); if (error) setError('') }} placeholder={mode === 'cancel' ? 'Укажите причину отмены приёма' : 'Укажите причину, по которой отмечаете неявку'} />
+        <span>{mode === 'cancel' ? 'Категория причины отмены' : 'Категория причины неявки'} <small>обязательно</small></span>
+        <select required value={reasonCategory} disabled={busy} aria-invalid={Boolean(error)} aria-describedby={error ? 'doctor-action-error' : undefined} onChange={(event) => { setReasonCategory(event.target.value); if (error) setError('') }}>
+          <option value="">Выберите причину</option>
+          {(mode === 'cancel' ? cancelReasons : noShowReasons).map((item) => <option key={item} value={item}>{item}</option>)}
+        </select>
       </label>
+      {reasonCategory === OTHER_REASON && <label className="form-field cabinet-field"><span>Комментарий <small>обязательно</small></span><textarea required rows={2} value={reasonComment} disabled={busy} aria-invalid={Boolean(error)} aria-describedby={error ? 'doctor-action-error' : undefined} onChange={(event) => { setReasonComment(event.target.value); if (error) setError('') }} placeholder="Уточните причину" /></label>}
       {error && <p id="doctor-action-error" className="form-message form-message--error" role="alert">{error}</p>}
       <div className="row-actions">
-        <Button type="submit" className={`button--compact ${mode === 'cancel' ? 'button--danger' : ''}`} disabled={busy}>{busy ? 'Сохраняем…' : mode === 'cancel' ? 'Подтвердить отмену' : 'Подтвердить неявку'}</Button>
+        <Button type="submit" className={`button--compact ${mode === 'cancel' ? 'button--danger' : ''}`} disabled={busy || !reasonRequired}>{busy ? 'Сохраняем…' : mode === 'cancel' ? 'Подтвердить отмену' : 'Подтвердить неявку'}</Button>
         <Button type="button" variant="quiet" className="button--compact" disabled={busy} onClick={() => { setMode(null); setError('') }}>Закрыть</Button>
       </div>
     </form>}
@@ -263,19 +288,23 @@ function AppointmentActions({ appointment, doctorId, durationMinutes, reload, on
       durationMinutes={durationMinutes}
       busy={busy}
       error={error}
-      onSubmit={(startsAt) => void submitReschedule(startsAt)}
+      refreshKey={availabilityRefresh}
+      onClearError={() => setError('')}
+      onSubmit={(startsAt, reason) => void submitReschedule(startsAt, reason)}
       onCancel={() => { setMode(null); setError('') }}
     />}
   </section>
 }
 
-function DoctorReschedulePicker({ appointment, doctorId, durationMinutes, busy, error, onSubmit, onCancel }: {
+function DoctorReschedulePicker({ appointment, doctorId, durationMinutes, busy, error, refreshKey, onClearError, onSubmit, onCancel }: {
   appointment: Appointment
   doctorId: string
   durationMinutes: number
   busy: boolean
   error: string
-  onSubmit: (startsAt: string) => void
+  refreshKey: number
+  onClearError: () => void
+  onSubmit: (startsAt: string, reason: string) => void
   onCancel: () => void
 }) {
   const minDate = addDays(0)
@@ -295,6 +324,9 @@ function DoctorReschedulePicker({ appointment, doctorId, durationMinutes, busy, 
   const [slots, setSlots] = useState<DaySlot[] | null>(null)
   const [slotsLoading, setSlotsLoading] = useState(false)
   const [slot, setSlot] = useState('')
+  const [reasonCategory, setReasonCategory] = useState('')
+  const [reasonComment, setReasonComment] = useState('')
+  const reasonRequired = reasonCategory !== '' && (reasonCategory !== OTHER_REASON || Boolean(reasonComment.trim()))
   const monthDates = useMemo(() => {
     const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
     return Array.from({ length: days }, (_, index) => toDateKey(new Date(month.getFullYear(), month.getMonth(), index + 1)))
@@ -308,7 +340,7 @@ function DoctorReschedulePicker({ appointment, doctorId, durationMinutes, busy, 
       .catch((calendarLoadError) => { if (current) setCalendarError(errorMessage(calendarLoadError, 'Не удалось загрузить доступность врача.')) })
       .finally(() => { if (current) setCalendarLoading(false) })
     return () => { current = false }
-  }, [appointment.id, doctorId, durationMinutes, monthDates])
+  }, [appointment.id, doctorId, durationMinutes, monthDates, refreshKey])
 
   useEffect(() => {
     let current = true
@@ -320,10 +352,18 @@ function DoctorReschedulePicker({ appointment, doctorId, durationMinutes, busy, 
       .catch((slotLoadError) => { if (current) setCalendarError(errorMessage(slotLoadError, 'Не удалось загрузить свободное время.')) })
       .finally(() => { if (current) setSlotsLoading(false) })
     return () => { current = false }
-  }, [appointment.id, date, doctorId, durationMinutes])
+  }, [appointment.id, date, doctorId, durationMinutes, refreshKey])
 
   return <div className="doctor-reschedule">
     <h4>Выберите новую дату и свободное время</h4>
+    <label className="form-field cabinet-field doctor-reschedule__reason">
+      <span>Причина переноса <small>обязательно</small></span>
+      <select required value={reasonCategory} disabled={busy} aria-invalid={Boolean(error)} onChange={(event) => { setReasonCategory(event.target.value); onClearError() }}>
+        <option value="">Выберите причину переноса</option>
+        {rescheduleReasons.map((item) => <option key={item} value={item}>{item}</option>)}
+      </select>
+    </label>
+    {reasonCategory === OTHER_REASON && <label className="form-field cabinet-field doctor-reschedule__reason"><span>Комментарий <small>обязательно</small></span><textarea required rows={2} value={reasonComment} disabled={busy} aria-invalid={Boolean(error)} onChange={(event) => { setReasonComment(event.target.value); onClearError() }} placeholder="Уточните причину переноса" /></label>}
     <BookingCalendar
       availability={availability}
       selectedDate={date}
@@ -334,7 +374,7 @@ function DoctorReschedulePicker({ appointment, doctorId, durationMinutes, busy, 
       error={calendarError}
       horizonLabel="Показываем расписание этого врача на ближайшие 60 дней."
       emptyMessage="У этого врача пока нет свободных дат."
-      onSelect={(nextDate) => { setDate(nextDate); setCalendarError('') }}
+      onSelect={(nextDate) => { setDate(nextDate); setCalendarError(''); onClearError() }}
       onMonthChange={(offset) => setMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1))}
     />
     <fieldset className="doctor-reschedule__slots">
@@ -344,12 +384,12 @@ function DoctorReschedulePicker({ appointment, doctorId, durationMinutes, busy, 
           : slots.length === 0 || !slots.some((entry) => entry.available && new Date(entry.startsAt).getTime() !== new Date(appointment.startsAt).getTime()) ? <EmptyState>{slots.length === 0 ? 'В этот день врач не принимает.' : 'Нет свободного времени для переноса — выберите другую дату.'}</EmptyState>
             : <div className="slot-grid">{slots.map((entry) => {
               const isCurrentTime = new Date(entry.startsAt).getTime() === new Date(appointment.startsAt).getTime()
-              return <button key={entry.startsAt} type="button" className={`slot ${slot === entry.startsAt ? 'slot--active' : ''}`} disabled={!entry.available || isCurrentTime || busy} aria-pressed={slot === entry.startsAt} title={isCurrentTime ? 'Это текущее время приёма' : entry.reason === 'busy' ? 'Время занято' : entry.reason === 'past' ? 'Время уже прошло' : undefined} onClick={() => setSlot(entry.startsAt)}>{formatTime(entry.startsAt)}</button>
+              return <button key={entry.startsAt} type="button" className={`slot ${slot === entry.startsAt ? 'slot--active' : ''}`} disabled={!entry.available || isCurrentTime || busy} aria-pressed={slot === entry.startsAt} title={isCurrentTime ? 'Это текущее время приёма' : entry.reason === 'busy' ? 'Время занято' : entry.reason === 'past' ? 'Время уже прошло' : undefined} onClick={() => { setSlot(entry.startsAt); onClearError() }}>{formatTime(entry.startsAt)}</button>
             })}</div>}
     </fieldset>
     {error && <p className="form-message form-message--error" role="alert">{error}</p>}
     <div className="row-actions doctor-reschedule__foot">
-      <Button type="button" className="button--compact" disabled={!slot || busy} onClick={() => onSubmit(slot)}>{busy ? 'Переносим…' : slot ? `Перенести на ${formatDateTime(slot)}` : 'Выберите время'}</Button>
+      <Button type="button" className="button--compact" disabled={!slot || !reasonRequired || busy} onClick={() => onSubmit(slot, formatActionReason(reasonCategory, reasonComment))}>{busy ? 'Переносим…' : !reasonRequired ? 'Укажите причину переноса' : slot ? `Перенести на ${formatDateTime(slot)}` : 'Выберите время'}</Button>
       <Button type="button" variant="quiet" className="button--compact" disabled={busy} onClick={onCancel}>Закрыть</Button>
     </div>
   </div>

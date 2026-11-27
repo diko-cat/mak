@@ -14,7 +14,12 @@ import {
   type CreateLabTestInput,
   type DemoAccount,
   type DoctorAbsence,
-  type DoctorArrival,
+  type AppointmentEvent,
+  type AppointmentEventType,
+  type AppointmentSnapshot,
+  type DoctorPresence,
+  type PresenceEvent,
+  type StaffRole,
   type Doctor,
   type DoctorInput,
   type LabTest,
@@ -48,6 +53,33 @@ function requirePermission(permission: Permission): User {
 
 const isActiveStatus = (status: AppointmentStatus) => status === 'requested' || status === 'confirmed'
 
+const snapshotOf = (appointment: Appointment): AppointmentSnapshot => ({ status: appointment.status, startsAt: appointment.startsAt, doctorId: appointment.doctorId })
+
+/** Добавляет неизменяемую запись в историю записи. `previous` — снимок до изменения. */
+function logAppointmentEvent(
+  database: MockDatabase,
+  appointment: Appointment,
+  type: AppointmentEventType,
+  actor: User,
+  options: { at?: string; reason?: string; previous?: AppointmentSnapshot } = {},
+): AppointmentEvent {
+  const event: AppointmentEvent = {
+    id: createId('event'),
+    appointmentId: appointment.id,
+    type,
+    actorRole: actor.role,
+    actorUserId: actor.id,
+    at: options.at ?? new Date().toISOString(),
+    reason: options.reason || undefined,
+    previous: options.previous,
+    next: snapshotOf(appointment),
+  }
+  database.appointmentEvents.push(event)
+  return event
+}
+
+const staffRoleOf = (user: User): StaffRole => (user.role === 'doctor' ? 'doctor' : 'admin')
+
 const accountFor = (role: Role): DemoAccount => {
   const account = readDatabase().accounts.find((entry) => entry.user.role === role)
   if (!account) throw new ApiError('Для этой роли пока нет демо-аккаунта.', 'DEMO_ACCOUNT_NOT_FOUND')
@@ -69,9 +101,11 @@ export async function login(credentials: LoginCredentials): Promise<User> {
   return { ...account.user }
 }
 
-/** Resets the local demo database without changing the current session. */
+/**
+ * Возвращает исходные синтетические демо-данные во всех вкладках. Сессия и тема остаются.
+ * Доступно любой роли и без входа: это управление демо, а не действие клиники.
+ */
 export async function resetDemoData(): Promise<void> {
-  requirePermission('doctors:manage')
   resetDemoDatabase()
 }
 
@@ -247,6 +281,7 @@ export async function createAppointment(input: CreateAppointmentInput): Promise<
     ticketNumber: nextTicketNumber(database),
   }
   database.appointments.push(appointment)
+  logAppointmentEvent(database, appointment, 'created', user)
   writeDatabase(database)
   return appointment
 }
@@ -281,7 +316,9 @@ function requireAppointmentAction(appointment: Appointment, assignedPermission: 
  * - подтвердить — администратор (только ожидающую);
  * - отменить — администратор любую активную, пациент свою, врач свою;
  *   причина обязательна для врача и администратора;
- * - неявка — администратор или врач у своего прошедшего приёма; причина обязательна для врача.
+ * - неявка — администратор или врач у своего прошедшего приёма; причина обязательна для врача;
+ *   нельзя, если приход пациента уже отмечен.
+ * Каждое действие пишет `AppointmentEvent` с автором, временем, причиной и снимками до/после.
  * Завершение приёма идёт через `completeAppointment`.
  */
 export async function updateAppointmentStatus(id: string, status: AppointmentStatus, reason?: string): Promise<Appointment> {
@@ -290,14 +327,16 @@ export async function updateAppointmentStatus(id: string, status: AppointmentSta
   if (!appointment) throw new ApiError('Запись не найдена.', 'APPOINTMENT_NOT_FOUND')
   const user = getSession()
   const trimmedReason = reason?.trim() ?? ''
+  const previous = snapshotOf(appointment)
+  const now = new Date().toISOString()
+  let actor: User
 
   if (status === 'confirmed') {
-    requirePermission('appointments:confirm')
+    actor = requirePermission('appointments:confirm')
     if (appointment.status !== 'requested') throw new ApiError('Подтвердить можно только запись, ожидающую подтверждения.', 'INVALID_STATUS_TRANSITION')
-    appointment.confirmedAt = new Date().toISOString()
+    appointment.confirmedAt = now
     appointment.status = 'confirmed'
   } else if (status === 'cancelled') {
-    let actor: User
     if (user?.role === 'patient') {
       actor = requirePermission('appointments:cancel-own')
       if (actor.patientId !== appointment.patientId) throw new ApiError('Отменить можно только свою запись.', 'FORBIDDEN')
@@ -309,21 +348,61 @@ export async function updateAppointmentStatus(id: string, status: AppointmentSta
     appointment.status = 'cancelled'
     appointment.cancelledBy = actor.role
     appointment.cancellationReason = trimmedReason || undefined
+    appointment.cancelledAt = now
   } else if (status === 'no-show') {
-    const actor = requireAppointmentAction(appointment, 'appointments:mark-no-show-assigned', 'appointments:cancel-any')
+    actor = requireAppointmentAction(appointment, 'appointments:mark-no-show-assigned', 'appointments:cancel-any')
     if (!isActiveStatus(appointment.status) || new Date(appointment.startsAt).getTime() > Date.now()) {
       throw new ApiError('Отметить неявку можно только у прошедшего незакрытого приёма.', 'INVALID_STATUS_TRANSITION')
     }
+    if (appointment.patientArrivedAt) throw new ApiError('Пациент уже отмечен как пришедший — неявку поставить нельзя.', 'PATIENT_ALREADY_ARRIVED')
     if (!trimmedReason && actor.role === 'doctor') throw new ApiError('Укажите причину неявки.', 'VALIDATION_ERROR')
     appointment.status = 'no-show'
-    appointment.noShowMarkedBy = actor.role === 'doctor' ? 'doctor' : 'admin'
+    appointment.noShowMarkedBy = staffRoleOf(actor)
     appointment.noShowReason = trimmedReason || undefined
+    appointment.noShowMarkedAt = now
   } else {
     throw new ApiError('Такой переход статуса недоступен.', 'INVALID_STATUS_TRANSITION')
   }
 
+  logAppointmentEvent(database, appointment, status, actor, { at: now, reason: trimmedReason, previous })
   writeDatabase(database)
   return appointment
+}
+
+/**
+ * Отмечает, что пациент пришёл на приём. Врач — только на свой приём, администратор — на любой.
+ * Только активная запись и только в день приёма. Повторный вызов ничего не меняет.
+ * Это приход пациента; приход врача на смену — `markDoctorArrival`.
+ */
+export async function markPatientArrived(appointmentId: string): Promise<Appointment> {
+  const database = readDatabase()
+  const appointment = database.appointments.find((entry) => entry.id === appointmentId)
+  if (!appointment) throw new ApiError('Запись не найдена.', 'APPOINTMENT_NOT_FOUND')
+  const actor = requireAppointmentAction(appointment, 'appointments:mark-patient-arrived', 'appointments:mark-patient-arrived')
+  if (appointment.patientArrivedAt) return appointment
+  if (!isActiveStatus(appointment.status)) throw new ApiError('Приход можно отметить только у запланированного приёма.', 'INVALID_STATUS_TRANSITION')
+  if (localDayKey(new Date(appointment.startsAt)) !== localDayKey()) throw new ApiError('Приход пациента отмечают в день приёма.', 'NOT_APPOINTMENT_DAY')
+  const previous = snapshotOf(appointment)
+  const now = new Date().toISOString()
+  appointment.patientArrivedAt = now
+  appointment.patientArrivalMarkedBy = staffRoleOf(actor)
+  logAppointmentEvent(database, appointment, 'patient-arrived', actor, { at: now, previous })
+  writeDatabase(database)
+  return appointment
+}
+
+/**
+ * История записей, отсортированная по времени. Видимость как у `getAppointments`:
+ * пациент — свои записи, врач — свои приёмы, администратор — все.
+ */
+export async function getAppointmentEvents(appointmentId?: string): Promise<AppointmentEvent[]> {
+  const user = getSession()
+  if (!user) throw new ApiError('Войдите в аккаунт, чтобы продолжить.', 'UNAUTHORIZED')
+  const visible = new Set((await getAppointments()).map((appointment) => appointment.id))
+  return readDatabase().appointmentEvents
+    .filter((event) => visible.has(event.appointmentId) && (!appointmentId || event.appointmentId === appointmentId))
+    .map((event) => ({ ...event }))
+    .sort((left, right) => left.at.localeCompare(right.at))
 }
 
 /** Принимает id пациента (как раньше) или фильтры по пациенту и врачу. */
@@ -378,7 +457,9 @@ export async function completeAppointment(
     diagnosis,
     recommendations: input.recommendations.trim(),
   }
+  const previous = snapshotOf(appointment)
   appointment.status = 'completed'
+  logAppointmentEvent(database, appointment, 'completed', user, { previous })
   database.conclusions.push(conclusion)
   writeDatabase(database)
   return { appointment, conclusion }
@@ -489,8 +570,10 @@ export async function updateCallRequestStatus(id: string, status: CallRequest['s
  * Перенос приёма на другое время. Администратор может передать приём другому врачу той же специальности,
  * врач переносит только свой приём и только к себе. Слот проверяется заново: прошедшее время,
  * рабочие часы и отсутствия врача, занятость врача и пациента. Запись и талон остаются прежними.
+ * `reason` обязателен для врача, для администратора необязателен. Прежние время и врач
+ * сохраняются в `AppointmentEvent.previous`; отметка прихода пациента сбрасывается.
  */
-export async function rescheduleAppointment(id: string, startsAtIso: string, doctorId?: string): Promise<Appointment> {
+export async function rescheduleAppointment(id: string, startsAtIso: string, doctorId?: string, reason?: string): Promise<Appointment> {
   const database = readDatabase()
   const appointment = database.appointments.find((entry) => entry.id === id)
   if (!appointment) throw new ApiError('Запись не найдена.', 'APPOINTMENT_NOT_FOUND')
@@ -499,6 +582,8 @@ export async function rescheduleAppointment(id: string, startsAtIso: string, doc
     throw new ApiError('Передать приём другому врачу может только администратор.', 'FORBIDDEN')
   }
   if (!isActiveStatus(appointment.status)) throw new ApiError('Перенести можно только запланированный приём.', 'INVALID_STATUS_TRANSITION')
+  const trimmedReason = reason?.trim() ?? ''
+  if (!trimmedReason && actor.role === 'doctor') throw new ApiError('Укажите причину переноса.', 'VALIDATION_ERROR')
   const doctor = database.doctors.find((entry) => entry.id === (doctorId ?? appointment.doctorId))
   const service = database.services.find((entry) => entry.id === appointment.serviceId)
   if (!doctor) throw new ApiError('Врач не найден.', 'DOCTOR_NOT_FOUND')
@@ -518,22 +603,32 @@ export async function rescheduleAppointment(id: string, startsAtIso: string, doc
   if (database.appointments.some((entry) => entry.id !== appointment.id && patientAppointmentConflict(entry, database, appointment.patientId, startsAt, duration))) {
     throw new ApiError('У пациента уже есть другая запись на это время.', 'PATIENT_APPOINTMENT_CONFLICT')
   }
+  const previous = snapshotOf(appointment)
+  const now = new Date().toISOString()
   appointment.doctorId = doctor.id
   appointment.rescheduledFrom ??= appointment.startsAt
   appointment.startsAt = startsAt.toISOString()
-  appointment.rescheduledBy = actor.role === 'doctor' ? 'doctor' : 'admin'
-  appointment.rescheduledAt = new Date().toISOString()
+  appointment.rescheduledBy = staffRoleOf(actor)
+  appointment.rescheduledAt = now
+  appointment.rescheduleReason = trimmedReason || undefined
+  delete appointment.patientArrivedAt
+  delete appointment.patientArrivalMarkedBy
+  logAppointmentEvent(database, appointment, 'rescheduled', actor, { at: now, reason: trimmedReason, previous })
   writeDatabase(database)
   return appointment
 }
 
-/* ───────────── Прибытие врачей ───────────── */
+/* ───────────── Врач на смене (DoctorPresence) ───────────── */
+
+function logPresenceEvent(database: MockDatabase, doctorId: string, date: string, type: PresenceEvent['type'], actor: User, at: string, reason?: string): void {
+  database.presenceEvents.push({ id: createId('presence'), doctorId, date, type, actorRole: staffRoleOf(actor), actorUserId: actor.id, at, reason: reason || undefined })
+}
 
 /**
- * Врач отмечает прибытие за себя на сегодняшний локальный день.
+ * Врач отмечает приход на смену за себя на сегодняшний локальный день.
  * Повторный вызов в тот же день не создаёт дубль и возвращает первую отметку.
  */
-export async function markDoctorArrival(): Promise<DoctorArrival> {
+export async function markDoctorArrival(): Promise<DoctorPresence> {
   const user = requirePermission('attendance:check-in')
   const database = readDatabase()
   if (!user.doctorId || !database.doctors.some((doctor) => doctor.id === user.doctorId)) {
@@ -541,30 +636,70 @@ export async function markDoctorArrival(): Promise<DoctorArrival> {
   }
   const now = new Date()
   const date = localDayKey(now)
-  const existing = database.doctorArrivals.find((entry) => entry.doctorId === user.doctorId && entry.date === date)
+  const existing = database.doctorPresence.find((entry) => entry.doctorId === user.doctorId && entry.date === date)
   if (existing) return { ...existing }
-  const arrival: DoctorArrival = { doctorId: user.doctorId, date, arrivedAt: now.toISOString() }
-  database.doctorArrivals.push(arrival)
+  const presence: DoctorPresence = { doctorId: user.doctorId, date, arrivedAt: now.toISOString() }
+  database.doctorPresence.push(presence)
+  logPresenceEvent(database, presence.doctorId, date, 'marked', user, presence.arrivedAt)
   writeDatabase(database)
-  return { ...arrival }
+  return { ...presence }
 }
 
-/** Своя отметка врача за день (YYYY-MM-DD, по умолчанию сегодня) или `null`, если отметки нет. */
-export async function getMyArrival(date: string = localDayKey()): Promise<DoctorArrival | null> {
+/**
+ * Снимает сегодняшнюю отметку смены (например, нажали по ошибке).
+ * Правила демо: только за сегодня; врач — только свою (`doctorId` не передаёт или передаёт свой),
+ * администратор — любого врача, причина обязательна. Если отметки нет, ничего не происходит.
+ */
+export async function clearDoctorArrival(options: { doctorId?: string; reason?: string } = {}): Promise<void> {
+  const user = getSession()
+  let doctorId: string
+  if (user?.role === 'doctor') {
+    requirePermission('attendance:check-in')
+    if (options.doctorId && options.doctorId !== user.doctorId) throw new ApiError('Снять можно только свою отметку.', 'FORBIDDEN')
+    doctorId = user.doctorId ?? ''
+  } else {
+    requirePermission('attendance:manage')
+    if (!options.doctorId) throw new ApiError('Выберите врача.', 'VALIDATION_ERROR')
+    if (!options.reason?.trim()) throw new ApiError('Укажите причину снятия отметки.', 'VALIDATION_ERROR')
+    doctorId = options.doctorId
+  }
+  const database = readDatabase()
+  const date = localDayKey()
+  const index = database.doctorPresence.findIndex((entry) => entry.doctorId === doctorId && entry.date === date)
+  if (index === -1) return
+  database.doctorPresence.splice(index, 1)
+  logPresenceEvent(database, doctorId, date, 'cleared', user!, new Date().toISOString(), options.reason?.trim())
+  writeDatabase(database)
+}
+
+/** Своя отметка смены за день (YYYY-MM-DD, по умолчанию сегодня) или `null`, если отметки нет. */
+export async function getMyArrival(date: string = localDayKey()): Promise<DoctorPresence | null> {
   const user = requirePermission('attendance:check-in')
   if (!validDateKey(date)) throw new ApiError('Выберите корректную дату.', 'VALIDATION_ERROR')
-  const arrival = readDatabase().doctorArrivals.find((entry) => entry.doctorId === user.doctorId && entry.date === date)
-  return arrival ? { ...arrival } : null
+  const presence = readDatabase().doctorPresence.find((entry) => entry.doctorId === user.doctorId && entry.date === date)
+  return presence ? { ...presence } : null
 }
 
-/** Отметки всех врачей за день (YYYY-MM-DD, по умолчанию сегодня), по времени прибытия. Только администратор. */
-export async function getDoctorArrivals(date: string = localDayKey()): Promise<DoctorArrival[]> {
+/** Отметки смены всех врачей за день (YYYY-MM-DD, по умолчанию сегодня), по времени прихода. Только администратор. */
+export async function getDoctorArrivals(date: string = localDayKey()): Promise<DoctorPresence[]> {
   requirePermission('attendance:view-all')
   if (!validDateKey(date)) throw new ApiError('Выберите корректную дату.', 'VALIDATION_ERROR')
-  return readDatabase().doctorArrivals
+  return readDatabase().doctorPresence
     .filter((entry) => entry.date === date)
     .map((entry) => ({ ...entry }))
     .sort((left, right) => left.arrivedAt.localeCompare(right.arrivedAt))
+}
+
+/** История отметок смены за день (по умолчанию сегодня): администратор — все врачи, врач — только свои. */
+export async function getPresenceEvents(date: string = localDayKey()): Promise<PresenceEvent[]> {
+  const user = getSession()
+  if (user?.role === 'doctor') requirePermission('attendance:check-in')
+  else requirePermission('attendance:view-all')
+  if (!validDateKey(date)) throw new ApiError('Выберите корректную дату.', 'VALIDATION_ERROR')
+  return readDatabase().presenceEvents
+    .filter((event) => event.date === date && (user?.role !== 'doctor' || event.doctorId === user.doctorId))
+    .map((event) => ({ ...event }))
+    .sort((left, right) => left.at.localeCompare(right.at))
 }
 
 /* ───────────── Администратор: врачи ───────────── */

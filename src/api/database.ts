@@ -3,16 +3,26 @@ import type {
   CallRequest,
   Clinic,
   DemoAccount,
+  AppointmentEvent,
+  AppointmentStatus,
   Doctor,
-  DoctorArrival,
+  DoctorPresence,
   LabTest,
   MedicalConclusion,
   Patient,
+  PresenceEvent,
+  Role,
   Service,
 } from '../types'
 import { weekdayHours } from './schedule'
 
+/**
+ * Демо-база клиники. Хранится целиком в localStorage браузера; сети и сервера нет.
+ * Читать и писать её можно только через функции `src/api`, экраны не трогают localStorage напрямую.
+ */
 export interface MockDatabase {
+  /** Версия схемы; при несовместимой версии база пересоздаётся из фикстур. */
+  schemaVersion: number
   clinic: Clinic
   doctors: Doctor[]
   services: Service[]
@@ -22,13 +32,56 @@ export interface MockDatabase {
   conclusions: MedicalConclusion[]
   labTests: LabTest[]
   callRequests: CallRequest[]
-  /** Отметки врачей о прибытии; в данных, сохранённых до этой версии, поля нет. */
-  doctorArrivals: DoctorArrival[]
+  /** Врачи на смене: одна отметка на врача за день. */
+  doctorPresence: DoctorPresence[]
+  /** История отметок смены (отметил / снял). */
+  presenceEvents: PresenceEvent[]
+  /** История действий с записями: создание, подтверждение, приход пациента, перенос, отмена, неявка, завершение. */
+  appointmentEvents: AppointmentEvent[]
 }
 
-export const DATABASE_KEY = 'sana-clinic.database.v5'
-const LEGACY_DATABASE_KEY = 'sana-clinic.database.v4'
+export const SCHEMA_VERSION = 6
+export const DATABASE_KEY = `sana-clinic.database.v${SCHEMA_VERSION}`
+/** Старые ключи: данные из них переносятся в текущий ключ и удаляются. */
+const LEGACY_DATABASE_KEYS = ['sana-clinic.database.v5', 'sana-clinic.database.v4']
 const DEMO_DAY_KEY = `${DATABASE_KEY}.seed-day.v2`
+
+/* ───────────── Подписка на изменения (эта и другие вкладки) ───────────── */
+
+let revision = 0
+let notifyScheduled = false
+const listeners = new Set<() => void>()
+let crossTabAttached = false
+
+function notifyChange(): void {
+  if (notifyScheduled) return
+  notifyScheduled = true
+  // Откладываем, чтобы запись из любого места не обновляла React посреди рендера; пачку записей объединяем.
+  queueMicrotask(() => {
+    notifyScheduled = false
+    revision += 1
+    for (const listener of listeners) listener()
+  })
+}
+
+function attachCrossTabSync(): void {
+  if (crossTabAttached || typeof window === 'undefined') return
+  crossTabAttached = true
+  // Событие `storage` приходит только в другие вкладки этого же профиля браузера.
+  window.addEventListener('storage', (event) => {
+    if (event.key === null || event.key === DATABASE_KEY) notifyChange()
+  })
+}
+
+/** Подписка на любые изменения демо-базы: в этой вкладке и в других вкладках того же браузера. */
+export function subscribeDatabase(listener: () => void): () => void {
+  attachCrossTabSync()
+  listeners.add(listener)
+  return () => { listeners.delete(listener) }
+}
+
+/** Номер версии данных; растёт при каждом изменении. Для `useSyncExternalStore`. */
+export const getDatabaseRevision = (): number => revision
 
 const atDayAndHour = (dayOffset: number, hour: number, minute = 0) => {
   const value = new Date()
@@ -89,29 +142,25 @@ function refreshDailyDemoAppointments(database: MockDatabase): void {
   const { first, second, firstServiceId } = todayDemoAppointments()
   const firstSeed = database.appointments.find((appointment) => appointment.id === 'appointment-7')
   const secondSeed = database.appointments.find((appointment) => appointment.id === 'appointment-8')
+  const clearActions = (appointment: Appointment) => {
+    for (const field of ['cancelledBy', 'cancellationReason', 'cancelledAt', 'noShowMarkedBy', 'noShowReason', 'noShowMarkedAt',
+      'rescheduledFrom', 'rescheduledBy', 'rescheduledAt', 'rescheduleReason', 'patientArrivedAt', 'patientArrivalMarkedBy'] as const) {
+      delete appointment[field]
+    }
+  }
   if (firstSeed) {
     firstSeed.startsAt = first
     firstSeed.serviceId = firstServiceId
     firstSeed.status = 'confirmed'
-    delete firstSeed.cancelledBy
-    delete firstSeed.cancellationReason
-    delete firstSeed.noShowMarkedBy
-    delete firstSeed.noShowReason
-    delete firstSeed.rescheduledFrom
-    delete firstSeed.rescheduledBy
-    delete firstSeed.rescheduledAt
+    clearActions(firstSeed)
   }
   if (secondSeed) {
     secondSeed.startsAt = second
     secondSeed.status = 'requested'
-    delete secondSeed.cancelledBy
-    delete secondSeed.cancellationReason
-    delete secondSeed.noShowMarkedBy
-    delete secondSeed.noShowReason
-    delete secondSeed.rescheduledFrom
-    delete secondSeed.rescheduledBy
-    delete secondSeed.rescheduledAt
+    clearActions(secondSeed)
   }
+  // История пересозданных демо-записей больше не соответствует им.
+  database.appointmentEvents = (database.appointmentEvents ?? []).filter((event) => event.appointmentId !== 'appointment-7' && event.appointmentId !== 'appointment-8')
   window.localStorage.setItem(DEMO_DAY_KEY, today)
   writeDatabase(database)
 }
@@ -143,27 +192,68 @@ function migrateDaysOff(database: MockDatabase): boolean {
   return migrated
 }
 
-const isArrival = (value: unknown): value is DoctorArrival => {
-  if (!value || typeof value !== 'object') return false
-  const entry = value as Record<string, unknown>
-  return typeof entry.doctorId === 'string'
-    && typeof entry.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(entry.date)
-    && typeof entry.arrivedAt === 'string' && !Number.isNaN(new Date(entry.arrivedAt).getTime())
-}
+/* ───────────── Проверка прочитанных данных ───────────── */
 
-/** Добавляет `doctorArrivals` в старые данные, убирает битые записи и дубли (оставляет самую раннюю отметку). */
-function normalizeArrivals(database: MockDatabase): boolean {
-  const source: unknown[] = Array.isArray(database.doctorArrivals) ? database.doctorArrivals : []
-  const byDay = new Map<string, DoctorArrival>()
-  for (const entry of source.filter(isArrival)) {
+type Json = Record<string, unknown>
+const ROLES: readonly Role[] = ['patient', 'doctor', 'admin']
+const STATUSES: readonly AppointmentStatus[] = ['requested', 'confirmed', 'completed', 'cancelled', 'no-show']
+const isObject = (value: unknown): value is Json => Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+const isString = (value: unknown): value is string => typeof value === 'string' && value.length > 0
+const isIso = (value: unknown): value is string => typeof value === 'string' && !Number.isNaN(new Date(value).getTime())
+const isDateKey = (value: unknown): value is string => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+const hasIds = (value: unknown, ...fields: string[]) => isObject(value) && fields.every((field) => isString(value[field]))
+
+const isValidAppointment = (value: unknown): value is Appointment => hasIds(value, 'id', 'patientId', 'doctorId', 'serviceId')
+  && isIso((value as Json).startsAt) && STATUSES.includes((value as Json).status as AppointmentStatus)
+const isValidAccount = (value: unknown): value is DemoAccount => isObject(value) && typeof value.password === 'string'
+  && hasIds(value.user, 'id', 'name', 'email') && ROLES.includes((value.user as Json).role as Role)
+const isPresence = (value: unknown): value is DoctorPresence => hasIds(value, 'doctorId') && isDateKey((value as Json).date) && isIso((value as Json).arrivedAt)
+const isPresenceEvent = (value: unknown): value is PresenceEvent => hasIds(value, 'id', 'doctorId', 'actorUserId')
+  && isDateKey((value as Json).date) && isIso((value as Json).at) && ['marked', 'cleared'].includes((value as Json).type as string)
+const isAppointmentEvent = (value: unknown): value is AppointmentEvent => hasIds(value, 'id', 'appointmentId', 'actorUserId', 'type')
+  && isIso((value as Json).at) && ROLES.includes((value as Json).actorRole as Role)
+
+/** Одна отметка на врача за день: из дублей остаётся самая ранняя. */
+function dedupePresence(entries: DoctorPresence[]): DoctorPresence[] {
+  const byDay = new Map<string, DoctorPresence>()
+  for (const entry of entries) {
     const key = `${entry.doctorId}|${entry.date}`
     const current = byDay.get(key)
     if (!current || entry.arrivedAt < current.arrivedAt) byDay.set(key, { doctorId: entry.doctorId, date: entry.date, arrivedAt: entry.arrivedAt })
   }
-  const normalized = [...byDay.values()]
-  const changed = !Array.isArray(database.doctorArrivals) || normalized.length !== source.length
-  database.doctorArrivals = normalized
-  return changed
+  return [...byDay.values()]
+}
+
+/**
+ * Проверяет JSON из localStorage и приводит его к текущей схеме.
+ * Возвращает `null`, если данные повреждены или сохранены более новой несовместимой версией:
+ * тогда вызывающий код восстанавливает исходные фикстуры.
+ */
+function parseDatabase(raw: string): MockDatabase | null {
+  let value: unknown
+  try { value = JSON.parse(raw) } catch { return null }
+  if (!isObject(value)) return null
+  if (typeof value.schemaVersion === 'number' && value.schemaVersion > SCHEMA_VERSION) return null
+  if (!hasIds(value.clinic, 'id', 'name')) return null
+  const lists = ['doctors', 'services', 'patients', 'accounts', 'appointments', 'conclusions', 'labTests', 'callRequests'] as const
+  if (!lists.every((key) => Array.isArray(value[key]))) return null
+  const list = (key: string) => value[key] as unknown[]
+  if (!list('doctors').every((entry) => hasIds(entry, 'id', 'name', 'specialty'))) return null
+  if (!list('services').every((entry) => hasIds(entry, 'id', 'name') && typeof (entry as Json).price === 'number' && typeof (entry as Json).durationMinutes === 'number')) return null
+  if (!list('patients').every((entry) => hasIds(entry, 'id', 'name'))) return null
+  if (!list('accounts').every(isValidAccount) || list('accounts').length === 0) return null
+  if (!list('appointments').every(isValidAppointment)) return null
+
+  // Необязательные списки новых версий: в старых данных их нет, битые элементы отбрасываем.
+  const optional = (key: string) => (Array.isArray(value[key]) ? value[key] as unknown[] : [])
+  const legacyArrivals = optional('doctorArrivals')
+  const database = value as unknown as MockDatabase & { doctorArrivals?: unknown }
+  database.doctorPresence = dedupePresence([...optional('doctorPresence'), ...legacyArrivals].filter(isPresence))
+  database.presenceEvents = optional('presenceEvents').filter(isPresenceEvent)
+  database.appointmentEvents = optional('appointmentEvents').filter(isAppointmentEvent)
+  delete database.doctorArrivals
+  database.schemaVersion = SCHEMA_VERSION
+  return database
 }
 
 /** YYYY-MM-DD через `dayOffset` дней от сегодня, в локальном времени. */
@@ -228,6 +318,9 @@ export function createSeedDatabase(): MockDatabase {
       { user: { id: 'user-admin', name: 'Администратор клиники', email: 'admin@sana.demo', role: 'admin' }, password: 'SanaAdmin2026' },
       { user: { id: 'user-doctor', name: doctors[0].name, email: 'doctor@sana.demo', role: 'doctor', doctorId: doctors[0].id }, password: 'SanaDoctor2026' },
       { user: { id: 'user-patient', name: patients[0].name, email: 'patient@sana.demo', role: 'patient', patientId: patients[0].id }, password: 'SanaPatient2026' },
+      // Дополнительные синтетические демо-сценарии: роль не ограничена одним аккаунтом.
+      ...doctors.slice(1).map((doctor, index): DemoAccount => ({ user: { id: `user-doctor-${index + 2}`, name: doctor.name, email: `doctor${index + 2}@sana.demo`, role: 'doctor', doctorId: doctor.id }, password: 'SanaDoctor2026' })),
+      ...patients.slice(1).map((patient, index): DemoAccount => ({ user: { id: `user-patient-${index + 2}`, name: patient.name, email: `patient${index + 2}@sana.demo`, role: 'patient', patientId: patient.id }, password: 'SanaPatient2026' })),
     ],
     appointments: [
       { id: 'appointment-1', patientId: patients[0].id, doctorId: doctors[0].id, serviceId: services[0].id, startsAt: atDayAndHour(2, 10), status: 'confirmed', note: 'Учащённое сердцебиение по вечерам', ticketNumber: 'Т-101' },
@@ -273,59 +366,84 @@ export function createSeedDatabase(): MockDatabase {
       { id: 'call-1', name: 'Дана', phone: '+7 701 000 00 01', preferredTime: 'После 18:00', createdAt: atDayAndHour(-1, 15), status: 'new' },
       { id: 'call-2', name: 'Арман', phone: '+7 702 000 00 02', preferredTime: 'Утром', createdAt: atDayAndHour(-2, 10), status: 'contacted' },
     ],
-    doctorArrivals: [],
+    doctorPresence: [],
+    presenceEvents: [],
+    appointmentEvents: [],
+    schemaVersion: SCHEMA_VERSION,
   }
 }
 
-export function readDatabase(): MockDatabase {
-  if (typeof window === 'undefined') return createSeedDatabase()
+/** Читает и проверяет сохранённую строку; при изменениях после миграции записывает обратно. */
+function loadFrom(raw: string): MockDatabase | null {
+  const database = parseDatabase(raw)
+  if (!database) return null
+  migrateDaysOff(database)
+  if (JSON.stringify(database) !== raw) writeDatabase(database)
+  refreshDailyDemoAppointments(database)
+  return database
+}
 
-  const raw = window.localStorage.getItem(DATABASE_KEY)
-  if (raw) {
-    try {
-      const database = JSON.parse(raw) as MockDatabase
-      const migrated = migrateDaysOff(database)
-      if (normalizeArrivals(database) || migrated) writeDatabase(database)
-      refreshDailyDemoAppointments(database)
-      return database
-    } catch {
-      window.localStorage.removeItem(DATABASE_KEY)
-    }
-  }
-
-  const legacyRaw = window.localStorage.getItem(LEGACY_DATABASE_KEY)
-  if (legacyRaw) {
-    try {
-      const database = JSON.parse(legacyRaw) as MockDatabase
-      migrateDaysOff(database)
-      normalizeArrivals(database)
-      writeDatabase(database)
-      refreshDailyDemoAppointments(database)
-      return database
-    } catch {
-      window.localStorage.removeItem(LEGACY_DATABASE_KEY)
-    }
-  }
-
+function seedDatabase(): MockDatabase {
   const database = createSeedDatabase()
   writeDatabase(database)
   window.localStorage.setItem(DEMO_DAY_KEY, localDayKey())
   return database
 }
 
-/** Replace local demo data while leaving the signed-in session in place. */
+/**
+ * Текущее состояние демо-базы. Повреждённые данные или данные несовместимой версии
+ * заменяются исходными синтетическими фикстурами; данные старых версий переносятся.
+ */
+export function readDatabase(): MockDatabase {
+  if (typeof window === 'undefined') return createSeedDatabase()
+
+  const raw = window.localStorage.getItem(DATABASE_KEY)
+  if (raw) {
+    const database = loadFrom(raw)
+    if (database) return database
+    console.warn('[demo] Сохранённые демо-данные повреждены или несовместимы, восстановлены исходные.')
+    return seedDatabase()
+  }
+
+  for (const key of LEGACY_DATABASE_KEYS) {
+    const legacyRaw = window.localStorage.getItem(key)
+    if (!legacyRaw) continue
+    window.localStorage.removeItem(key)
+    window.localStorage.removeItem(`${key}.seed-day.v2`)
+    const database = loadFrom(legacyRaw)
+    if (database) {
+      writeDatabase(database)
+      return database
+    }
+  }
+
+  return seedDatabase()
+}
+
+/** Удаляет локальные пометки «просмотрено» кабинета пациента (`src/store/seenIds.ts`). */
+function clearSeenMarks(): void {
+  for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+    const key = window.localStorage.key(index)
+    if (key?.startsWith(SEEN_KEY_PREFIX)) window.localStorage.removeItem(key)
+  }
+}
+
+/** Префикс ключей пометок «просмотрено». */
+export const SEEN_KEY_PREFIX = 'sana-clinic.seen.v1.'
+
+/** Возвращает исходные синтетические данные. Сессия и тема остаются. */
 export function resetDemoDatabase(): MockDatabase {
-  if (typeof window !== 'undefined') window.localStorage.removeItem(DEMO_DAY_KEY)
-  const database = createSeedDatabase()
-  writeDatabase(database)
-  if (typeof window !== 'undefined') window.localStorage.setItem(DEMO_DAY_KEY, localDayKey())
-  return database
+  if (typeof window === 'undefined') return createSeedDatabase()
+  window.localStorage.removeItem(DEMO_DAY_KEY)
+  clearSeenMarks()
+  return seedDatabase()
 }
 
 export function writeDatabase(database: MockDatabase): void {
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem(DATABASE_KEY, JSON.stringify(database))
-  }
+  if (typeof window === 'undefined') return
+  database.schemaVersion = SCHEMA_VERSION
+  window.localStorage.setItem(DATABASE_KEY, JSON.stringify(database))
+  notifyChange()
 }
 
 export function createId(prefix: string): string {

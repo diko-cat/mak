@@ -114,25 +114,94 @@ export interface Appointment {
   /** Кто отменил запись. */
   cancelledBy?: Role
   cancellationReason?: string
-  /** Время первоначальной записи до первого переноса (ISO). */
+  /** Когда запись отменили (ISO). */
+  cancelledAt?: string
+  /** Время первоначальной записи до первого переноса (ISO). Полная история — в `AppointmentEvent`. */
   rescheduledFrom?: string
   /** Кто перенёс запись последним. */
-  rescheduledBy?: Exclude<Role, 'patient'>
+  rescheduledBy?: StaffRole
   /** Когда запись перенесли последний раз (ISO). */
   rescheduledAt?: string
+  /** Причина последнего переноса. */
+  rescheduleReason?: string
   /** Кто отметил неявку пациента. */
-  noShowMarkedBy?: Exclude<Role, 'patient'>
+  noShowMarkedBy?: StaffRole
   /** Причина или комментарий к неявке. */
   noShowReason?: string
+  /** Когда отметили неявку (ISO). */
+  noShowMarkedAt?: string
+  /**
+   * Пациент пришёл на этот приём (ISO). Это событие пациента, оно не связано
+   * с приходом врача на смену (`DoctorPresence`).
+   */
+  patientArrivedAt?: string
+  /** Кто отметил приход пациента. */
+  patientArrivalMarkedBy?: StaffRole
 }
 
-/** Отметка врача о прибытии на работу. Одна на врача за локальный день. */
-export interface DoctorArrival {
+/** Роли сотрудников клиники: могут менять чужие записи. */
+export type StaffRole = Exclude<Role, 'patient'>
+
+/**
+ * Врач на смене: одна отметка на врача за локальный день.
+ * Не путать с приходом пациента на приём (`Appointment.patientArrivedAt`).
+ */
+export interface DoctorPresence {
   doctorId: string
   /** Локальная дата приложения, YYYY-MM-DD. */
   date: string
   /** Момент отметки, ISO. */
   arrivedAt: string
+}
+
+/** @deprecated Старое имя `DoctorPresence`, оставлено для уже подключённых экранов. */
+export type DoctorArrival = DoctorPresence
+
+export type AppointmentEventType =
+  | 'created'
+  | 'confirmed'
+  | 'patient-arrived'
+  | 'rescheduled'
+  | 'cancelled'
+  | 'no-show'
+  | 'completed'
+
+/** Снимок изменяемых полей записи до и после действия. */
+export interface AppointmentSnapshot {
+  status: AppointmentStatus
+  startsAt: string
+  doctorId: string
+}
+
+/** Запись в истории записи на приём. Создаётся при каждом изменении, не редактируется. */
+export interface AppointmentEvent {
+  id: string
+  appointmentId: string
+  type: AppointmentEventType
+  /** Роль, выполнившая действие. */
+  actorRole: Role
+  /** id пользователя демо-сессии. */
+  actorUserId: string
+  /** Когда выполнено действие (ISO). */
+  at: string
+  reason?: string
+  previous?: AppointmentSnapshot
+  next?: AppointmentSnapshot
+}
+
+export type PresenceEventType = 'marked' | 'cleared'
+
+/** История отметок врача на смене. */
+export interface PresenceEvent {
+  id: string
+  doctorId: string
+  /** Локальная дата смены, YYYY-MM-DD. */
+  date: string
+  type: PresenceEventType
+  actorRole: StaffRole
+  actorUserId: string
+  at: string
+  reason?: string
 }
 
 export interface MedicalConclusion {
@@ -239,8 +308,10 @@ export type Permission =
   | 'appointments:cancel-assigned'
   | 'appointments:mark-no-show-assigned'
   | 'appointments:reschedule-assigned'
+  | 'appointments:mark-patient-arrived'
   | 'attendance:check-in'
   | 'attendance:view-all'
+  | 'attendance:manage'
   | 'results:view-own'
   | 'patients:view-own'
   | 'patients:view-all'
