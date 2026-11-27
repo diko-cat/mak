@@ -233,6 +233,7 @@
 .doctor-working-hours { margin: 0 0 8px; }
 .doctor-working-hours strong { color: var(--ink-strong); }
 .doctor-arrival { display: grid; gap: 7px; margin: 0 0 12px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-alt); }
+.doctor-arrival__hint { margin: 0; color: var(--muted); font-size: 11px; }
 .doctor-arrival__saved { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--green); font-size: 13px; }
 .doctor-arrival__saved strong { color: var(--ink-strong); }
 .doctor-arrival .form-message { margin: 0; }
@@ -253,6 +254,12 @@
 .doctor-action-form { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--page); }
 .doctor-action-form .cabinet-field { margin: 0; }
 .doctor-action-form .form-message { margin: 0; }
+.doctor-action-form select[aria-invalid="true"], .doctor-reschedule select[aria-invalid="true"], .doctor-reschedule textarea[aria-invalid="true"] { border-color: var(--danger); }
+.doctor-patient-attendance { display: flex; align-items: center; gap: 7px; margin: 12px 0 0; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: var(--surface-alt); font-size: 12px; }
+.doctor-patient-attendance strong { color: var(--ink-strong); }
+.doctor-patient-attendance--arrived { border-color: color-mix(in srgb, var(--green) 35%, var(--line)); color: var(--green); background: var(--green-soft); }
+.doctor-patient-attendance--absent { border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); color: var(--danger); background: var(--danger-soft); }
+.doctor-reschedule__reason { margin: 0; }
 .doctor-reschedule { display: grid; gap: 12px; padding: 14px; border: 1px solid color-mix(in srgb, var(--green) 35%, var(--line)); border-radius: 9px; background: var(--page); }
 .doctor-reschedule h4 { margin: 0; color: var(--ink-strong); font-size: 14px; }
 .doctor-reschedule .booking-calendar { max-width: 420px; }
@@ -356,6 +363,8 @@
   .choice-grid { grid-template-columns: 1fr; }
   .facts { gap: 10px 18px; }
   .patient-card { gap: 10px; }
+  .doctor-appointment-actions .row-actions, .doctor-reschedule__foot { align-items: stretch; }
+  .doctor-reschedule__foot { display: grid; grid-template-columns: 1fr; }
   .conclusion-form__foot { flex-wrap: wrap; }
   .booking-summary-card dl div { grid-template-columns: 70px minmax(0, 1fr); }
   .lab__table th, .lab__table td { padding: 6px 4px; }
